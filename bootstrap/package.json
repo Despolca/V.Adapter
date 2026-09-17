@@ -1,0 +1,7 @@
+{
+    "name": "v-adapter-bootstrap",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Bootloader server của V.Adapter: Load bản triển khai tương thích giao thức NovelAI nằm trong thư mục extension theo nhu cầu bên trong tiến trình SillyTavern"
+}

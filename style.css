@@ -1,0 +1,210 @@
+/* Style extension V.Adapter SillyTavern (Ngăn extension + Overlay bảng quản lý) */
+
+/* -- Ngăn extension (Khởi động/Dừng dịch vụ giao thức + Tên + Phiên bản + Mở bảng điều khiển) -- */
+#v_adapter_drawer .v_adapter_version {
+    font-size: 11px;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.6;
+    margin-left: 6px;
+    font-weight: 400;
+}
+
+#v_adapter_drawer .v_adapter_content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 6px;
+}
+
+#v_adapter_drawer .v_adapter_row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Các nút trong ngăn extension đồng loạt chiếm toàn bộ dòng và căn giữa, nếu không sẽ bị nén thành xếp dọc. */
+#v_adapter_drawer #v_adapter_open_panel,
+#v_adapter_drawer #v_adapter_svc_toggle,
+#v_adapter_drawer #v_adapter_svc_reload {
+    width: 100%;
+    justify-content: center;
+}
+
+/* Khối dịch vụ giao thức mặc định bị ẩn: Kênh xuất ảnh chính không phụ thuộc vào nó, khi chưa deploy thì không nên xuất hiện cảm giác "Chưa cài đặt". */
+#v_adapter_drawer .v_adapter_svc_block {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#v_adapter_drawer .v_adapter_svc {
+    justify-content: space-between;
+    padding: 2px 0;
+}
+
+#v_adapter_drawer .v_adapter_svc_label {
+    font-size: 13px;
+    opacity: 0.85;
+}
+
+#v_adapter_drawer .v_adapter_svc_state {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+}
+
+#v_adapter_drawer .v_adapter_svc_state.v_adapter_svc_on {
+    color: #16a34a;
+    border-color: rgba(22, 163, 74, 0.5);
+}
+
+#v_adapter_drawer .v_adapter_svc_state.v_adapter_svc_off {
+    opacity: 0.65;
+}
+
+#v_adapter_drawer .menu_button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+#v_adapter_drawer .v_adapter_svc_hint {
+    display: block;
+    margin-top: 4px;
+    line-height: 1.5;
+    opacity: 0.75;
+}
+
+#v_adapter_drawer .v_adapter_svc_hint code {
+    padding: 0 3px;
+    border-radius: 3px;
+    background: var(--SmartThemeBlurTintColor, rgba(127, 127, 127, 0.18));
+}
+
+/* -- Overlay bảng quản lý --
+   Kích thước được quyết định hoàn toàn bởi độ lệch (offset) trên/dưới/trái/phải của absolute positioning, không sử dụng chiều cao phần trăm (percentage height) hoặc flexbox:
+   Trình duyệt điện thoại và WebView trong app có sự khác biệt lớn khi phân tích position: fixed + chiều cao phần trăm,
+   việc fix cứng độ lệch có thể đảm bảo thiết bị nào cũng lấy được khu vực hiển thị khác 0. */
+#v_adapter_panel_overlay {
+    --va-pad: 24px;
+    --va-chrome: 30px;
+    --va-gap: 10px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    /* Không thể dùng độ lệch top/bottom hoặc chiều cao phần trăm: SillyTavern trên mobile set body thành position: fixed,
+       2 thuộc tính này trên Chromium Android sẽ bị phân tích thành chiều cao = 0, overlay bị ép bẹp, nội dung bảng không thể nhìn thấy.
+       100vh và giá trị pixel do JS gán đều có thể lấy được full chiều cao trên cả mobile và desktop. */
+    height: 100vh;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.75);
+    box-sizing: border-box;
+}
+
+/* Màn hình hẹp (Mobile): Overlay full màn hình, chỉ giữ lại một thanh thao tác, nội dung bảng hiển thị full chiều rộng */
+@media (max-width: 720px) {
+    #v_adapter_panel_overlay {
+        --va-pad: 0px;
+        --va-chrome: 44px;
+        --va-gap: 0px;
+    }
+}
+
+#v_adapter_panel_overlay .v_adapter_panel_chrome {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--va-chrome);
+    box-sizing: border-box;
+    padding: 0 var(--va-pad);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#v_adapter_panel_overlay .v_adapter_panel_chrome > span:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#v_adapter_panel_overlay .v_adapter_panel_chrome .menu_button {
+    color: #fff;
+    white-space: nowrap;
+    flex: none;
+}
+
+@media (max-width: 720px) {
+    #v_adapter_panel_overlay .v_adapter_panel_chrome .menu_button {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+}
+
+#v_adapter_panel_overlay .v_adapter_panel_actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+}
+
+#v_adapter_panel_overlay #v_adapter_panel_iframe {
+    position: absolute;
+    top: calc(var(--va-chrome) + var(--va-gap));
+    left: var(--va-pad);
+    /* iframe là replaced element: width/height lấy auto sẽ lùi về kích thước vốn có là 300x150,
+       độ lệch trái phải cũng bị vô hiệu hóa theo, do đó ở đây tính toán kích thước một cách rõ ràng (explicit). */
+    width: calc(100% - var(--va-pad) * 2);
+    height: calc(100% - var(--va-chrome) - var(--va-gap) - var(--va-pad));
+    border: none;
+    border-radius: 12px;
+    background: #0f172a;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* Gợi ý dự phòng (fallback) khi nhúng thất bại (Một số trình duyệt mobile và WebView trong app cấm iframe) */
+#v_adapter_panel_overlay #v_adapter_panel_fallback {
+    display: none;
+    position: absolute;
+    top: calc(var(--va-chrome) + var(--va-gap));
+    left: var(--va-pad);
+    right: var(--va-pad);
+    bottom: var(--va-pad);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    background: #0f172a;
+    border-radius: 12px;
+}
+
+#v_adapter_panel_overlay #v_adapter_panel_fallback.show {
+    display: flex;
+}
+
+#v_adapter_panel_overlay .v_adapter_panel_fallback_card {
+    max-width: 460px;
+    color: #e2e8f0;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+#v_adapter_panel_overlay .v_adapter_panel_fallback_card b {
+    display: block;
+    font-size: 15px;
+    margin-bottom: 8px;
+}
+
+#v_adapter_panel_overlay .v_adapter_panel_fallback_card p {
+    margin: 0 0 14px;
+    color: #94a3b8;
+}
