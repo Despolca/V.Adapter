@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>V. · Adapter Giao thức NovelAI</title>
+<title>V. · NovelAI 协议适配</title>
 <style>
 :root{
   --bg:#0f172a; --fg:hsl(210 20% 96%); --card:hsl(222 24% 12%);
@@ -103,11 +103,11 @@ td.prompt{max-width:260px;word-break:break-word}
 .code{display:block;padding:8px 10px;border-radius:8px;background:hsl(222 26% 8%);border:1px solid var(--border);font-size:12px;word-break:break-all}
 .muted{color:var(--muted-fg)}
 .err{color:var(--danger);font-size:12.5px;line-height:1.6;word-break:break-word}
-/* Gợi ý phạm vi tác dụng: Giải thích sự phụ thuộc của cấu hình engine (extension này vs plugin server :8888) */
+/* 作用范围提示：说明引擎配置的归属（本扩展 vs :8888 服务端插件） */
 .scope-note{margin:0 0 16px;padding:12px 15px;border-radius:10px;border:1px solid hsl(38 92% 50% / .35);background:hsl(38 92% 50% / .08);font-size:12.5px;line-height:1.75}
 .scope-note b{color:var(--warning)}
 .preview{margin-top:12px;max-width:100%;border-radius:10px;border:1px solid var(--border);display:none}
-/* Placeholder hiển thị khi ảnh tải thất bại: Đính kèm địa chỉ gốc, thuận tiện phán đoán do đường dẫn hay do file */
+/* 图片加载失败的可见占位：附原始地址，便于判断是路径问题还是文件问题 */
 .img-broken{display:block;margin-top:12px;padding:12px 14px;font-size:12px;line-height:1.65;color:var(--danger);background:hsl(0 72% 58% / .08);border:1px dashed hsl(0 72% 58% / .35);border-radius:10px;word-break:break-all}
 .img-broken b{display:block;margin-bottom:4px;font-size:13px}
 /* toast */
@@ -121,23 +121,28 @@ td.prompt{max-width:260px;word-break:break-word}
 .mask-card{width:100%;max-width:390px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px 24px;box-shadow:0 20px 60px rgb(0 0 0 / .5)}
 .mask-card h2{font-size:18px;margin-bottom:8px}
 .mask-card p{font-size:12.5px;color:var(--muted-fg);line-height:1.65;margin-bottom:16px}
+/* 需要用户看清的说明块：这条链路「能做什么、做不到什么」必须在配上游的地方就说清。
+   字号与正文同为 14px、行高更松 —— 用户明确要求「看得清清楚楚」 */
+.notice{margin-bottom:16px;padding:16px 18px;border-radius:10px;border:1px solid hsl(38 92% 50% / .45);background:hsl(38 92% 50% / .09);font-size:14px;line-height:1.9;color:var(--fg)}
+.notice:last-child{margin-bottom:0}
+.notice b{color:var(--warning)}
 </style>
 </head>
 <body>
 
-<!-- Màn che Đăng nhập / Lần đầu thiết lập mật khẩu -->
+<!-- 登录 / 首次设密 遮罩 -->
 <div id="mask">
   <div class="mask-card">
-    <h2 id="mask-title">Bảng quản lý đã bị khóa</h2>
-    <p id="mask-desc">Vui lòng nhập mật khẩu bảng điều khiển để tiếp tục.</p>
+    <h2 id="mask-title">管理面板已锁定</h2>
+    <p id="mask-desc">请输入面板密码后继续。</p>
     <label class="field">
-      <span class="lab">Mật khẩu bảng điều khiển</span>
-      <input type="password" id="mask-pw" placeholder="Vui lòng nhập mật khẩu" autocomplete="current-password">
+      <span class="lab">面板密码</span>
+      <input type="password" id="mask-pw" placeholder="请输入密码" autocomplete="current-password">
     </label>
     <div class="err" id="mask-err"></div>
     <div class="row" style="margin-top:14px">
-      <button class="btn primary" id="mask-submit">Đăng nhập</button>
-      <button class="btn ghost" id="mask-skip" style="display:none">Tạm thời không thiết lập, vào thẳng</button>
+      <button class="btn primary" id="mask-submit">登录</button>
+      <button class="btn ghost" id="mask-skip" style="display:none">暂不设置，直接进入</button>
     </div>
   </div>
 </div>
@@ -151,18 +156,18 @@ td.prompt{max-width:260px;word-break:break-word}
           <div class="brand-name">V.</div>
         </div>
       </div>
-      <div class="brand-sub">Dịch vụ adapter NovelAI · VILK</div>
+      <div class="brand-sub">NovelAI 协议适配服务 · VILK</div>
     </div>
     <nav class="sidebar-nav">
-      <button class="nav-btn active" data-page="overview">Tổng quan hoạt động</button>
-      <button class="nav-btn" data-page="translate">Biên dịch nhân vật</button>
-      <button class="nav-btn" data-page="logs">Lịch sử sinh ảnh</button>
-      <button class="nav-btn" data-page="settings">Trung tâm cài đặt</button>
+      <button class="nav-btn active" data-page="overview">运行总览</button>
+      <button class="nav-btn" data-page="translate">角色转译</button>
+      <button class="nav-btn" data-page="logs">生成记录</button>
+      <button class="nav-btn" data-page="settings">设置中心</button>
     </nav>
     <div class="sidebar-foot">
-      <span class="pill" id="pill"><span class="pdot"></span><span id="pill-text">Trực tuyến</span></span>
+      <span class="pill" id="pill"><span class="pdot"></span><span id="pill-text">在线</span></span>
       <div class="foot-note" id="foot-version">V.Adapter</div>
-      <button class="btn sm ghost" id="btn-logout">Đăng xuất</button>
+      <button class="btn sm ghost" id="btn-logout">退出登录</button>
     </div>
   </aside>
 
@@ -170,195 +175,207 @@ td.prompt{max-width:260px;word-break:break-word}
 
   <main class="main">
     <header class="topbar">
-      <button class="hamb" id="btn-menu" aria-label="Mở menu">
+      <button class="hamb" id="btn-menu" aria-label="打开菜单">
         <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h16M1 13h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
       <div class="tb-title">V.Adapter</div>
     </header>
     <div class="content">
 
-      <!-- Tổng quan hoạt động -->
+      <!-- 运行总览 -->
       <section class="page active" id="page-overview">
         <div class="page-head">
-          <h1>Tổng quan hoạt động</h1>
-          <p>Trạng thái dịch vụ, cấu hình đang có hiệu lực (Key đã che giấu) và lịch sử sinh ảnh gần nhất. Client gọi đến endpoint <span class="mono">/ai/</span> của dịch vụ này thông qua kênh NovelAI.</p>
+          <h1>运行总览</h1>
+          <p>服务状态、当前生效配置（Key 脱敏）与最近生成记录。客户端通过 NovelAI 渠道调用本服务的 <span class="mono">/ai/</span> 端点。</p>
         </div>
 
         <div class="grid c3">
-          <div class="stat"><div class="v" id="st-version">-</div><div class="k">Phiên bản</div></div>
-          <div class="stat"><div class="v" id="st-uptime">-</div><div class="k">Thời gian chạy</div></div>
-          <div class="stat ok"><div class="v" id="st-success">0</div><div class="k">Thành công / Thất bại</div></div>
+          <div class="stat"><div class="v" id="st-version">-</div><div class="k">版本</div></div>
+          <div class="stat"><div class="v" id="st-uptime">-</div><div class="k">运行时长</div></div>
+          <div class="stat ok"><div class="v" id="st-success">0</div><div class="k">成功 / 失败</div></div>
         </div>
 
         <div class="grid c2">
           <div class="card">
-            <div class="card-head"><div><div class="card-title">Trạng thái dịch vụ</div><div class="card-desc">Địa chỉ lắng nghe và thông tin khởi động</div></div></div>
+            <div class="card-head"><div><div class="card-title">服务状态</div><div class="card-desc">监听地址与启动信息</div></div></div>
             <div class="card-body">
-              <div class="kv"><span class="k">Địa chỉ lắng nghe</span><span class="v mono" id="st-listen">-</span></div>
-              <div class="kv"><span class="k">Thời gian khởi động</span><span class="v mono" id="st-started">-</span></div>
-              <div class="kv"><span class="k">Xác thực key NovelAI</span><span class="v" id="st-naikey">-</span></div>
-              <div class="kv"><span class="k">Sinh ảnh chat dự phòng</span><span class="v" id="st-chatfallback">-</span></div>
-              <div class="kv"><span class="k">Mật khẩu bảng điều khiển</span><span class="v" id="st-panelpw">-</span></div>
+              <div class="kv"><span class="k">监听地址</span><span class="v mono" id="st-listen">-</span></div>
+              <div class="kv"><span class="k">启动时间</span><span class="v mono" id="st-started">-</span></div>
+              <div class="kv"><span class="k">NovelAI key 校验</span><span class="v" id="st-naikey">-</span></div>
+              <div class="kv"><span class="k">聊天生图兜底</span><span class="v" id="st-chatfallback">-</span></div>
+              <div class="kv"><span class="k">面板密码</span><span class="v" id="st-panelpw">-</span></div>
             </div>
           </div>
 
           <div class="card">
-            <div class="card-head"><div><div class="card-title">API tương thích OpenAI</div><div class="card-desc">API sinh ảnh tương thích OpenAI (Key hiển thị đã che giấu)</div></div></div>
+            <div class="card-head"><div><div class="card-title">OpenAI 兼容 API</div><div class="card-desc">OpenAI 兼容生图 API（Key 脱敏显示）</div></div></div>
             <div class="card-body">
-              <div class="kv"><span class="k">Địa chỉ API</span><span class="v mono" id="st-qwenurl">-</span></div>
-              <div class="kv"><span class="k">Model</span><span class="v mono" id="st-qwenmodel">-</span></div>
+              <div class="kv"><span class="k">API 地址</span><span class="v mono" id="st-qwenurl">-</span></div>
+              <div class="kv"><span class="k">模型</span><span class="v mono" id="st-qwenmodel">-</span></div>
               <div class="kv"><span class="k">API Key</span><span class="v mono" id="st-qwenkey">-</span></div>
-              <div class="kv"><span class="k">Kích thước mặc định</span><span class="v mono" id="st-defaultsize">-</span></div>
+              <div class="kv"><span class="k">默认尺寸</span><span class="v mono" id="st-defaultsize">-</span></div>
             </div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-head">
-            <div><div class="card-title">Thông tin kết nối client</div><div class="card-desc">Hãy điền địa chỉ dưới đây vào kênh NovelAI (Không cần hậu tố /ai, client sẽ tự động nối vào)</div></div>
+            <div><div class="card-title">客户端对接信息</div><div class="card-desc">把下面地址填进 NovelAI 渠道（不要带 /ai 后缀，客户端会自动补）</div></div>
           </div>
           <div class="card-body">
-            <div class="kv"><span class="k">URL Kênh NovelAI</span><span class="v"><code class="code mono" id="st-baseurl">-</code></span></div>
-            <div class="kv"><span class="k">Key Kênh NovelAI</span><span class="v" id="st-naikey-hint">-</span></div>
-            <div class="kv"><span class="k">Endpoint thực tế</span><span class="v mono muted">POST /ai/generate-image　·　GET /ai/user/subscription　·　Tên model tùy chọn (Server sẽ bỏ qua)</span></div>
+            <div class="kv"><span class="k">NovelAI 渠道 URL</span><span class="v"><code class="code mono" id="st-baseurl">-</code></span></div>
+            <div class="kv"><span class="k">NovelAI 渠道 Key</span><span class="v" id="st-naikey-hint">-</span></div>
+            <div class="kv"><span class="k">实际端点</span><span class="v mono muted">POST /ai/generate-image　·　GET /ai/user/subscription　·　模型名可任选（服务端忽略）</span></div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-head">
-            <div><div class="card-title">Test kết nối</div><div class="card-desc">Thực hiện một lần gọi sinh ảnh tuyến trên, xác minh toàn bộ chuỗi luồng (Không ảnh hưởng đến cấu hình hệ thống)</div></div>
+            <div><div class="card-title">测试连接</div><div class="card-desc">实调一次上游生图，验证整条链路（不影响线上配置）</div></div>
             <div class="row">
-              <button class="btn ghost sm" id="btn-test-advanced">Tùy chọn nâng cao</button>
-              <button class="btn primary" id="btn-test">Test kết nối</button>
+              <button class="btn ghost sm" id="btn-test-advanced">高级选项</button>
+              <button class="btn primary" id="btn-test">测试连接</button>
             </div>
           </div>
           <div class="card-body">
             <div id="test-advanced" style="display:none">
               <div class="grid c2">
-                <label class="field"><span class="lab">Ghi đè Địa chỉ API (Tùy chọn)</span><input type="text" id="t-url" placeholder="Để trống = Dùng cài đặt hiện tại"></label>
-                <label class="field"><span class="lab">Ghi đè Model (Tùy chọn)</span><input type="text" id="t-model" placeholder="Để trống = Dùng cài đặt hiện tại"></label>
-                <label class="field"><span class="lab">Ghi đè Key (Tùy chọn)</span><input type="password" id="t-key" placeholder="Để trống = Dùng cài đặt hiện tại"></label>
-                <label class="field"><span class="lab">Ghi đè Kích thước (Tùy chọn)</span><input type="text" id="t-size" placeholder="Ví dụ 1024x1024"></label>
+                <label class="field"><span class="lab">覆盖 API 地址（可选）</span><input type="text" id="t-url" placeholder="留空 = 用当前设置"></label>
+                <label class="field"><span class="lab">覆盖模型（可选）</span><input type="text" id="t-model" placeholder="留空 = 用当前设置"></label>
+                <label class="field"><span class="lab">覆盖 Key（可选）</span><input type="password" id="t-key" placeholder="留空 = 用当前设置"></label>
+                <label class="field"><span class="lab">覆盖尺寸（可选）</span><input type="text" id="t-size" placeholder="如 1024x1024"></label>
               </div>
             </div>
-            <div id="test-result" class="muted">Chưa test.</div>
-            <img id="test-preview" class="preview" alt="Kết quả sinh ảnh test">
+            <div id="test-result" class="muted">尚未测试。</div>
+            <img id="test-preview" class="preview" alt="测试生成结果">
           </div>
         </div>
 
         <div class="card">
-          <div class="card-head"><div><div class="card-title">Lịch sử sinh ảnh gần nhất</div><div class="card-desc">5 mục mới nhất; Để xem toàn bộ, xem trang "Lịch sử sinh ảnh"</div></div>
-            <button class="btn ghost sm" id="btn-refresh-overview">Làm mới</button></div>
+          <div class="card-head"><div><div class="card-title">最近生成记录</div><div class="card-desc">最新 5 条；完整记录见「生成记录」页</div></div>
+            <button class="btn ghost sm" id="btn-refresh-overview">刷新</button></div>
           <div class="card-body" style="padding:0">
-            <table><thead><tr><th>Thời gian</th><th>Loại</th><th>Kích thước</th><th>Luồng</th><th>Thời gian (ms)</th><th>Kết quả</th><th>Prompt</th></tr></thead>
-            <tbody id="recent-rows"><tr><td colspan="7" class="muted" style="padding:14px 10px">Tạm thời chưa có lịch sử</td></tr></tbody></table>
+            <table><thead><tr><th>时间</th><th>类型</th><th>尺寸</th><th>链路</th><th>耗时</th><th>结果</th><th>提示词</th></tr></thead>
+            <tbody id="recent-rows"><tr><td colspan="7" class="muted" style="padding:14px 10px">暂无记录</td></tr></tbody></table>
           </div>
         </div>
       </section>
 
-      <!-- Trung tâm cài đặt -->
+      <!-- 设置中心 -->
       <section class="page" id="page-settings">
         <div class="page-head">
-          <h1>Trung tâm cài đặt</h1>
-          <p>Lưu xong sẽ có hiệu lực ngay (hot-reload) và ghi vào <span class="mono">data/settings.json</span> (Khởi động lại không bị mất). Để trống ô nhập Key = Không sửa; Nếu muốn xóa, vui lòng bấm nút "Xóa" tương ứng.</p>
+          <h1>设置中心</h1>
+          <p>保存后立即热生效并写入 <span class="mono">data/settings.json</span>（重启不丢失）。Key 输入框留空 = 不修改；清除请点对应「清除」按钮。</p>
         </div>
 
         <div class="scope-note">
-          <b>Phạm vi tác dụng:</b> Cấu hình trang này chỉ có hiệu lực cho lệnh <span class="mono">/vgen</span> và chức năng xuất ảnh biên dịch nhân vật của <b>extension này</b>.
-          Các client xuất ảnh thông qua cổng <span class="mono">:8888</span> (V.Canvas, plugin NAI bên thứ ba) sẽ đọc
-          bản cấu hình của <b>server plugin</b> (<span class="mono">&lt;SillyTavern&gt;\plugins\V.Adapter\data\</span>).
-          Hai đường dẫn có cấu hình riêng biệt, cần thiết lập riêng rẽ.
+          <b>作用范围：</b>本页配置只对<b>本扩展</b>的 <span class="mono">/vgen</span> 命令与角色转译出图生效。
+          经 <span class="mono">:8888</span> 端口出图的客户端（V.Canvas、第三方 NAI 插件）读取的是
+          <b>服务端插件</b>那一份配置（<span class="mono">&lt;SillyTavern&gt;\plugins\V.Adapter\data\</span>）。
+          两条管道各有一份配置，需分别设置。
         </div>
 
         <div class="card">
-          <div class="card-head"><div><div class="card-title">API tương thích OpenAI</div><div class="card-desc">API sinh ảnh tương thích OpenAI</div></div></div>
+          <div class="card-head"><div><div class="card-title">OpenAI 兼容 API</div><div class="card-desc">OpenAI 兼容生图 API</div></div></div>
           <div class="card-body">
-            <label class="field"><span class="lab">Địa chỉ API</span>
+            <div class="notice">
+              <b>这条链路是怎么画图的 —— 先看清，能省掉大量困惑</b>
+              <br>本服务把 NovelAI 协议的请求转成 <b>OpenAI 兼容接口</b>发出去，
+              <b>图是由上游模型生成的</b>，本服务不参与作画。
+              <br>· 上游是<b>生图模型</b>（qwen-image-2.0、dall-e-3 这类）：按提示词出图，尺寸等参数直接生效。
+              <br>· 上游是<b>聊天画图模型</b>（反代的 qwen3.8-max 这类）：本质是<b>多模态模型在画</b>，
+              因此会出现<b>基于指令的拒答</b> —— 这一类拒答<b>有机会</b>被提示词前缀影响
+              （就是客户端里那个「生图破限词」）。
+              <br>⚠️ 但<b>平台级安全过滤不受提示词影响</b>：若上游服务商在服务端就拦掉请求、
+              或对出图结果再做一次安全分类，提示词怎么写都不会放行。所以「破限」是<b>有机会、不保证</b>，
+              别理解成一定能解掉审核。反复尝试还可能触发上游风控，风险由使用者自行承担。
+            </div>
+            <label class="field"><span class="lab">API 地址</span>
               <input type="text" id="s-qwen-url" placeholder="http://127.0.0.1:4000/v1">
-              <span class="hint">Base URL của interface sinh ảnh tương thích OpenAI, thường kết thúc bằng /v1.</span></label>
+              <span class="hint">OpenAI 兼容生图接口的 base url，通常带 /v1 结尾。</span></label>
             <label class="field"><span class="lab">API Key</span>
-              <input type="password" id="s-qwen-key" placeholder="（Chưa cài đặt）" autocomplete="new-password">
-              <span class="hint" id="hint-qwen-key">Để trống = Không sửa Key hiện tại.</span></label>
-            <label class="field"><span class="lab">Tên model</span>
+              <input type="password" id="s-qwen-key" placeholder="（未设置）" autocomplete="new-password">
+              <span class="hint" id="hint-qwen-key">留空 = 不修改当前 Key。</span></label>
+            <label class="field"><span class="lab">模型名</span>
               <input type="text" id="s-qwen-model" placeholder="qwen3.8-max"></label>
-            <label class="field"><span class="lab">Kích thước mặc định</span>
+            <label class="field"><span class="lab">默认尺寸</span>
               <input type="text" id="s-default-size" placeholder="1024x1024">
-              <span class="hint">Kích thước fallback khi client không gửi kích thước, hoặc tuyến trên từ chối kích thước, định dạng "RộngxCao".</span></label>
+              <span class="hint">客户端没传尺寸、或上游拒绝其尺寸时的兜底，格式「宽x高」。</span></label>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-head"><div><div class="card-title">Kênh NovelAI và Độ tương thích</div><div class="card-desc">Thông số kết nối của client và chiến lược giáng cấp (fallback)</div></div></div>
+          <div class="card-head"><div><div class="card-title">NovelAI 渠道与兼容</div><div class="card-desc">客户端对接参数与降级策略</div></div></div>
           <div class="card-body">
-            <label class="field"><span class="lab">Key kết nối NovelAI</span>
-              <input type="password" id="s-nai-key" placeholder="（Không xác thực）" autocomplete="new-password">
-              <span class="hint" id="hint-nai-key">Để trống = Không sửa Key hiện tại. Giá trị này chính là Key cần điền vào kênh NovelAI của client; Xóa đi thì key nào cũng có thể gọi.</span></label>
-            <label class="field"><span class="lab">Luồng sinh ảnh (Chọn theo loại model tuyến trên)</span>
+            <label class="field"><span class="lab">NovelAI 接入 Key</span>
+              <input type="password" id="s-nai-key" placeholder="（不校验）" autocomplete="new-password">
+              <span class="hint" id="hint-nai-key">留空 = 不修改当前 Key。此值即客户端 NovelAI 渠道要填的 Key；清空后则任意 key 均可调用。</span></label>
+            <label class="field"><span class="lab">生图链路（按上游模型类型选择）</span>
               <select id="s-chat-fallback">
-                <option value="auto">auto — Thử interface sinh ảnh tiêu chuẩn trước, thất bại tự động chuyển sang interface chat (Khuyên dùng; hỗ trợ cả hai loại tuyến trên)</option>
-                <option value="off">off — Chỉ sử dụng interface sinh ảnh tiêu chuẩn, thất bại không fallback. Phù hợp với các tuyến trên sinh ảnh OpenAI thuần túy (Model sinh ảnh)</option>
-                <option value="openai">openai — Chỉ sử dụng interface sinh ảnh OpenAI tiêu chuẩn, thất bại báo lỗi ngay (Hiệu quả giống off)</option>
-                <option value="chat_only">chat_only — Chỉ sử dụng interface chat để sinh ảnh. Chỉ phù hợp với model "Sinh ảnh trong trò chuyện"; Model sinh ảnh dùng luồng này sẽ trả về 400</option>
+                <option value="auto">auto — 先试标准生图接口，失败自动转聊天接口（推荐；两类上游都能用）</option>
+                <option value="off">off — 只走标准生图接口，失败不兜底。适用于正经 OpenAI 生图上游（生图模型）</option>
+                <option value="openai">openai — 只走标准 OpenAI 生图接口，失败即报错（效果与 off 相同）</option>
+                <option value="chat_only">chat_only — 只走聊天接口生图。仅适用于「在聊天里画图」的模型；生图模型走此路会返回 400</option>
               </select>
-              <span class="hint">Cách chọn: Model tuyến trên là <b>model sinh ảnh</b> (qwen-image-2.0, dall-e-3 v.v., đi qua /images/generations, xuất ảnh khoảng 6s/tấm) -> Chọn auto / off / openai; Tuyến trên là <b>model chat sinh ảnh</b> (Như qwen3.8-max qua reverse proxy, interface tiêu chuẩn luôn báo 500, chỉ có thể xuất ảnh bằng chat, khoảng 30~60s/tấm) -> Chọn auto hoặc chat_only.</span></label>
-            <label class="field"><span class="lab">Địa chỉ lắng nghe</span>
+              <span class="hint">怎么选：上游模型是<b>生图模型</b>（qwen-image-2.0、dall-e-3 这类，走 /images/generations，出图约 6 秒/张）→ 选 auto / off / openai；上游是<b>聊天画图模型</b>（反代的 qwen3.8-max 这类，标准接口稳定 500，只能靠聊天出图，约 30~60 秒/张）→ 选 auto 或 chat_only。</span></label>
+            <label class="field"><span class="lab">监听地址</span>
               <input type="text" id="s-listen" placeholder="0.0.0.0:8888">
-              <span class="hint">Sửa xong cần khởi động lại dịch vụ mới có hiệu lực (Triển khai trên server điền 0.0.0.0:port).</span></label>
+              <span class="hint">修改后需重启服务生效（服务器部署填 0.0.0.0:端口）。</span></label>
             <div class="row">
-              <button class="btn primary" id="btn-save">Lưu cài đặt</button>
-              <button class="btn danger sm" id="btn-clear-qwen">Xóa API Key</button>
-              <button class="btn danger sm" id="btn-clear-nai">Xóa Key kết nối</button>
+              <button class="btn primary" id="btn-save">保存设置</button>
+              <button class="btn danger sm" id="btn-clear-qwen">清除 API 密钥</button>
+              <button class="btn danger sm" id="btn-clear-nai">清除接入密钥</button>
             </div>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-head"><div><div class="card-title">Mật khẩu bảng điều khiển</div><div class="card-desc">Lần đầu không cần mật khẩu; Sau khi cài đặt, các endpoint quản lý sẽ yêu cầu đăng nhập (Session 24h)</div></div></div>
+          <div class="card-head"><div><div class="card-title">面板密码</div><div class="card-desc">首次可免密进入；设置后管理端点需登录（会话 24h）</div></div></div>
           <div class="card-body">
-            <label class="field"><span class="lab">Mật khẩu mới</span>
-              <input type="password" id="s-panel-pw" placeholder="Ít nhất 4 ký tự" autocomplete="new-password">
-              <span class="hint" id="hint-panel-pw">Khi chưa cài mật khẩu, bất kỳ ai truy cập bảng điều khiển này đều có thể sửa cấu hình; Triển khai ra public internet bắt buộc phải cài đặt.</span></label>
+            <label class="field"><span class="lab">新密码</span>
+              <input type="password" id="s-panel-pw" placeholder="至少 4 位" autocomplete="new-password">
+              <span class="hint" id="hint-panel-pw">未设置密码时，任何人访问本面板都能改配置；公网部署请务必设置。</span></label>
             <div class="row">
-              <button class="btn" id="btn-set-pw">Thiết lập / Đổi mật khẩu</button>
-              <button class="btn danger sm" id="btn-close-pw">Tắt mật khẩu bảng điều khiển</button>
+              <button class="btn" id="btn-set-pw">设置 / 修改密码</button>
+              <button class="btn danger sm" id="btn-close-pw">关闭面板密码</button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Biên dịch nhân vật -->
+      <!-- 角色转译 -->
       <section class="page" id="page-translate">
         <div class="page-head">
-          <h1>Biên dịch nhân vật</h1>
-          <p>Nhập một câu mô tả nhân vật hoặc bối cảnh, xuất thẳng ra ảnh. Prompt được biên dịch ra sẽ được hiển thị kèm theo, có thể copy hoặc tinh chỉnh lại rồi mới xuất.</p>
+          <h1>角色转译</h1>
+          <p>输入一句角色或场景描述，直接出图。转译出来的提示词会一并展示，可复制走或微调后再出。</p>
         </div>
         <div class="card">
-          <div class="card-head"><div><div class="card-title">Nhập mô tả</div><div class="card-desc">Hỗ trợ ngôn ngữ tự nhiên, ví dụ "Nobita Tamako trong Doraemon"</div></div></div>
+          <div class="card-head"><div><div class="card-title">输入描述</div><div class="card-desc">支持自然语言，如「哆啦A梦里面的野比玉子」</div></div></div>
           <div class="card-body">
-            <textarea id="tr-text" rows="4" placeholder="Ví dụ: Nobita Tamako trong Doraemon" style="width:100%;background:hsl(222 18% 14%);color:var(--fg);border:1px solid hsl(222 18% 22%);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:13.5px;resize:vertical"></textarea>
+            <textarea id="tr-text" rows="4" placeholder="例如：哆啦A梦里面的野比玉子" style="width:100%;background:hsl(222 18% 14%);color:var(--fg);border:1px solid hsl(222 18% 22%);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:13.5px;resize:vertical"></textarea>
             <div class="row" style="margin-top:10px;flex-wrap:wrap;align-items:center;gap:10px">
-              <button class="btn primary" id="btn-translate-gen">Biên dịch và Xuất ảnh</button>
-              <button class="btn ghost" id="btn-translate">Chỉ biên dịch Text</button>
-              <button class="btn ghost sm" id="btn-copy-translate">Copy Text</button>
+              <button class="btn primary" id="btn-translate-gen">转译并出图</button>
+              <button class="btn ghost" id="btn-translate">仅转译文字</button>
+              <button class="btn ghost sm" id="btn-copy-translate">复制文本</button>
             </div>
             <div class="row" style="margin-top:10px;flex-wrap:wrap;align-items:center;gap:14px">
               <label class="row" style="gap:6px;font-size:12.5px;align-items:center;width:auto">
-                <span class="muted">Kích thước</span>
+                <span class="muted">尺寸</span>
                 <select id="tr-size" style="width:auto;min-width:190px">
-                  <option value="">Tự động (Dùng kích thước đề xuất sau khi biên dịch)</option>
-                  <option value="832x1216">832x1216 · Bố cục dọc</option>
-                  <option value="1216x832">1216x832 · Bố cục ngang</option>
-                  <option value="1024x1024">1024x1024 · Bố cục vuông</option>
-                  <option value="1024x1536">1024x1536 · Dọc lớn</option>
-                  <option value="1536x1024">1536x1024 · Ngang lớn</option>
+                  <option value="">自动（用转译推荐尺寸）</option>
+                  <option value="832x1216">832x1216 · 竖构图</option>
+                  <option value="1216x832">1216x832 · 横构图</option>
+                  <option value="1024x1024">1024x1024 · 方图</option>
+                  <option value="1024x1536">1024x1536 · 大竖图</option>
+                  <option value="1536x1024">1536x1024 · 大横图</option>
                 </select>
               </label>
             </div>
             <div id="tr-image-wrap" style="display:none;margin-top:16px">
-              <img id="tr-image" alt="Kết quả xuất ảnh biên dịch nhân vật" style="display:block;max-width:100%;border-radius:10px;border:1px solid var(--border)">
+              <img id="tr-image" alt="角色转译出图结果" style="display:block;max-width:100%;border-radius:10px;border:1px solid var(--border)">
               <div class="row" style="margin-top:10px;flex-wrap:wrap;align-items:center;gap:10px">
-                <a class="btn ghost sm" id="btn-dl-image" download="translate.png">Tải ảnh xuống</a>
-                <button class="btn ghost sm" id="btn-regen">Sinh thêm tấm nữa (Cùng prompt)</button>
+                <a class="btn ghost sm" id="btn-dl-image" download="translate.png">下载图片</a>
+                <button class="btn ghost sm" id="btn-regen">再出一张（同提示词）</button>
                 <span class="muted" id="tr-image-info" style="font-size:12.5px"></span>
               </div>
             </div>
@@ -367,24 +384,24 @@ td.prompt{max-width:260px;word-break:break-word}
         </div>
       </section>
 
-      <!-- Lịch sử sinh ảnh -->
+      <!-- 生成记录 -->
       <section class="page" id="page-logs">
         <div class="page-head">
-          <h1>Lịch sử sinh ảnh</h1>
-          <p>200 mục sinh ảnh/test gần nhất (Lưu trên bộ nhớ RAM, xóa sạch khi khởi động lại).</p>
+          <h1>生成记录</h1>
+          <p>最近 200 条生成/测试记录（内存保存，重启清空）。</p>
         </div>
         <div class="card">
           <div class="card-head">
-            <div><div class="card-title">Lịch sử</div><div class="card-desc" id="logs-count">-</div></div>
+            <div><div class="card-title">记录</div><div class="card-desc" id="logs-count">-</div></div>
             <div class="row">
-              <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="logs-auto" style="width:auto"> Tự động làm mới</label>
-              <button class="btn ghost sm" id="btn-refresh-logs">Làm mới</button>
-              <button class="btn danger sm" id="btn-clear-logs">Xóa sạch</button>
+              <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="logs-auto" style="width:auto"> 自动刷新</label>
+              <button class="btn ghost sm" id="btn-refresh-logs">刷新</button>
+              <button class="btn danger sm" id="btn-clear-logs">清空</button>
             </div>
           </div>
           <div class="card-body" style="padding:0">
-            <table><thead><tr><th>Thời gian</th><th>Loại</th><th>Kích thước</th><th>Luồng</th><th>Thời gian (ms)</th><th>Kết quả</th><th>Prompt</th><th>Lỗi</th></tr></thead>
-            <tbody id="log-rows"><tr><td colspan="8" class="muted" style="padding:14px 10px">Tạm thời chưa có lịch sử</td></tr></tbody></table>
+            <table><thead><tr><th>时间</th><th>类型</th><th>尺寸</th><th>链路</th><th>耗时</th><th>结果</th><th>提示词</th><th>错误</th></tr></thead>
+            <tbody id="log-rows"><tr><td colspan="8" class="muted" style="padding:14px 10px">暂无记录</td></tr></tbody></table>
           </div>
         </div>
       </section>
@@ -400,12 +417,12 @@ td.prompt{max-width:260px;word-break:break-word}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-/* -- Phân tích địa chỉ hình ảnh --
-   Trang này nằm ở /scripts/extensions/third-party/<extension>/panel.html, mà địa chỉ hình ảnh SillyTavern trả về là
-   đường dẫn gốc (/user/images/...). Chỗ này cần đồng bộ parse thành địa chỉ absolute theo gốc của SillyTavern, tránh việc viết tương đối bị parse nhầm vào thư mục extension. */
+/* ── 图片地址解析 ──
+   本页位于 /scripts/extensions/third-party/<扩展>/panel.html，而酒馆返回的图片地址是
+   根路径（/user/images/…）。此处统一按酒馆根解析成绝对地址，避免相对写法被解析到扩展目录下。 */
 const APP_BASE = (() => {
-  try { if (window.parent && window.parent !== window && window.parent.location) return window.parent.location.href; } catch (e) { /* Bỏ qua cross-domain */ }
-  try { if (window.opener && window.opener.location) return window.opener.location.href; } catch (e) { /* Bỏ qua cross-domain */ }
+  try { if (window.parent && window.parent !== window && window.parent.location) return window.parent.location.href; } catch (e) { /* 跨域忽略 */ }
+  try { if (window.opener && window.opener.location) return window.opener.location.href; } catch (e) { /* 跨域忽略 */ }
   return location.href.replace(/scripts\/extensions\/.*$/, '');
 })();
 
@@ -416,7 +433,7 @@ function imgUrl(u) {
   try { return new URL(s.replace(/^\.\//, ''), APP_BASE).href; } catch (e) { return s; }
 }
 
-// Khi tải ảnh thất bại, hiển thị nguyên nhân thay vì để lại khung trống
+// 图片加载失败时把原因显示出来，而不是留一个空白框
 function showImgError(el, url) {
   if (!el) return;
   el.style.display = 'none';
@@ -426,33 +443,33 @@ function showImgError(el, url) {
     tip.className = 'img-broken';
     el.insertAdjacentElement('afterend', tip);
   }
-  tip.innerHTML = '<b>Ảnh không thể hiển thị</b><br>' +
-    '<a href="' + esc(url || '') + '" target="_blank" rel="noopener noreferrer">Mở địa chỉ này trong tab mới (Dùng để chẩn đoán xem link bị lỗi hay do mạng local)</a><br>' +
+  tip.innerHTML = '<b>图片未能加载</b><br>' +
+    '<a href="' + esc(url || '') + '" target="_blank" rel="noopener noreferrer">在新标签页打开这个地址（可用于判断是链接失效还是本机网络问题）</a><br>' +
     esc(url || '');
 }
 
 let AUTH = { setup_required: false, locked: false };
 let STATUS = {};
 
-/* -- Request chung -- */
-// Hàm cầu nối được gắn trên object trang của SillyTavern, trang này có thể được mở nhúng bằng iframe (window.parent),
-// hoặc được mở bằng tab mới (window.opener). Cả hai trường hợp đều trỏ về cùng một trang SillyTavern.
+/* ── 通用请求 ── */
+// 桥接函数挂在酒馆页面对象上，本页可能以内嵌 iframe（window.parent）打开，
+// 也可能被新标签页打开（window.opener）。两种情形都指向同一个酒馆页面。
 const HOST = (() => {
-  try { if (window.parent && window.parent !== window) return window.parent; } catch (e) { /* Bỏ qua cross-domain */ }
-  try { if (window.opener) return window.opener; } catch (e) { /* Bỏ qua cross-domain */ }
+  try { if (window.parent && window.parent !== window) return window.parent; } catch (e) { /* 跨域忽略 */ }
+  try { if (window.opener) return window.opener; } catch (e) { /* 跨域忽略 */ }
   return window;
 })();
 
 async function api(path, opts = {}) {
-  // Bridge của bản extension: Giao diện và chức năng của bảng quản lý được giữ nguyên 1:1, chỉ thay tầng HTTP bằng các endpoint ảo (virtual endpoint) tích hợp trong extension
-  // (__V_ADAPTER_API__ do extension inject, trả về {ok, status, data}).
+  // 扩展版桥接：面板 UI 与功能 1:1 保留，仅把 HTTP 层换成扩展内置虚拟端点
+  // （__V_ADAPTER_API__ 由扩展注入，返回 {ok, status, data}）。
   let parsed = null;
   if (opts.body) {
     try { parsed = JSON.parse(opts.body); } catch (e) { parsed = null; }
   }
   const bridge = HOST && HOST.__V_ADAPTER_API__;
   if (typeof bridge !== 'function') {
-    throw new Error('Chưa kết nối được với trang SillyTavern: Vui lòng vào từ "Mở bảng quản lý" trong ngăn extension');
+    throw new Error('未连接到酒馆页面：请从扩展抽屉内的「打开管理面板」进入');
   }
   return await bridge(path, (opts.method || 'GET'), parsed);
 }
@@ -468,13 +485,13 @@ function toast(msg, kind = 'ok') {
 function humanUptime(sec) {
   sec = Number(sec) || 0;
   const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
-  if (d > 0) return d + ' ngày ' + h + ' giờ';
-  if (h > 0) return h + ' giờ ' + m + ' phút';
-  if (m > 0) return m + ' phút ' + (sec % 60) + ' giây';
-  return sec + ' giây';
+  if (d > 0) return d + '天' + h + '小时';
+  if (h > 0) return h + '小时' + m + '分';
+  if (m > 0) return m + '分' + (sec % 60) + '秒';
+  return sec + '秒';
 }
 
-/* -- Đăng nhập / Lần đầu cài mật khẩu -- */
+/* ── 登录 / 首次设密 ── */
 function showMask(mode) {
   const mask = $('#mask');
   mask.classList.add('show');
@@ -482,14 +499,14 @@ function showMask(mode) {
   $('#mask-err').textContent = '';
   $('#mask-pw').value = '';
   if (mode === 'setup') {
-    $('#mask-title').textContent = 'Sử dụng lần đầu: Khuyên dùng mật khẩu bảng điều khiển';
-    $('#mask-desc').textContent = 'Bảng điều khiển hiện không có mật khẩu, bất kỳ ai truy cập vào dịch vụ này đều có thể sửa cấu hình. Bạn có thể bỏ qua bước này và thiết lập lại sau trong "Trung tâm cài đặt".';
-    $('#mask-submit').textContent = 'Cài mật khẩu và Đăng nhập';
+    $('#mask-title').textContent = '首次使用：建议设置面板密码';
+    $('#mask-desc').textContent = '当前面板无密码，任何能访问本服务的人都能修改配置。可先跳过，稍后在「设置中心」设置。';
+    $('#mask-submit').textContent = '设置密码并进入';
     $('#mask-skip').style.display = 'inline-flex';
   } else {
-    $('#mask-title').textContent = 'Bảng quản lý đã bị khóa';
-    $('#mask-desc').textContent = 'Vui lòng nhập mật khẩu bảng điều khiển để tiếp tục.';
-    $('#mask-submit').textContent = 'Đăng nhập';
+    $('#mask-title').textContent = '管理面板已锁定';
+    $('#mask-desc').textContent = '请输入面板密码后继续。';
+    $('#mask-submit').textContent = '登录';
     $('#mask-skip').style.display = 'none';
   }
   setTimeout(() => $('#mask-pw').focus(), 50);
@@ -511,11 +528,11 @@ $('#mask-submit').onclick = async () => {
   const mode = $('#mask').dataset.mode;
   if (mode === 'setup') {
     const r = await api('/admin/auth/setup', { method: 'POST', body: JSON.stringify({ password: pw }) });
-    if (!r.ok || !r.data || !r.data.success) { $('#mask-err').textContent = (r.data && r.data.error) || 'Cài đặt thất bại'; return; }
-    toast('Đã cài đặt mật khẩu bảng điều khiển');
+    if (!r.ok || !r.data || !r.data.success) { $('#mask-err').textContent = (r.data && r.data.error) || '设置失败'; return; }
+    toast('面板密码已设置');
   } else {
     const r = await api('/admin/auth/login', { method: 'POST', body: JSON.stringify({ password: pw }) });
-    if (!r.ok || !r.data || !r.data.success) { $('#mask-err').textContent = (r.data && r.data.error) || 'Đăng nhập thất bại'; return; }
+    if (!r.ok || !r.data || !r.data.success) { $('#mask-err').textContent = (r.data && r.data.error) || '登录失败'; return; }
   }
   hideMask();
   await loadAll();
@@ -525,12 +542,12 @@ $('#mask-skip').onclick = () => { hideMask(); loadAll(); };
 
 $('#btn-logout').onclick = async () => {
   await api('/admin/auth/logout', { method: 'POST' });
-  toast('Đã đăng xuất');
+  toast('已退出登录');
   const ok = await refreshAuth();
-  if (!ok) { /* Màn che đã hiển thị */ }
+  if (!ok) { /* 遮罩已显示 */ }
 };
 
-/* -- Chuyển trang -- */
+/* ── 页面切换 ── */
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b === btn));
@@ -541,14 +558,14 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   };
 });
 
-/* Mobile: Sidebar Drawer */
+/* 移动端：侧边栏抽屉 */
 function toggleSidebar(open) {
   document.querySelector('.sidebar').classList.toggle('open', open);
   $('#mask-mobile').classList.toggle('show', open);
 }
 $('#btn-menu').onclick = () => toggleSidebar(true);
 
-/* -- Trạng thái -- */
+/* ── 状态 ── */
 async function loadStatus() {
   const r = await api('/admin/status');
   if (!r.ok || !r.data) return;
@@ -560,26 +577,26 @@ async function loadStatus() {
   $('#st-success').textContent = (c.success || 0) + ' / ' + (c.fail || 0);
   $('#st-listen').textContent = r.data.listen || '-';
   $('#st-started').textContent = r.data.started_at || '-';
-  $('#st-naikey').textContent = s.nai_key_required ? ('Đã bật (' + (s.nai_key_masked || '') + ')') : 'Tắt (Dùng key bất kỳ)';
-  $('#st-chatfallback').textContent = ({ auto: 'auto (Thất bại tự chuyển sang chat)', off: 'off (Chỉ interface tiêu chuẩn)', chat_only: 'chat_only (Chỉ interface chat)', openai: 'openai (Interface OpenAI tiêu chuẩn, không fallback)' })[s.chat_fallback] || s.chat_fallback;
-  $('#st-panelpw').textContent = AUTH.setup_required ? 'Chưa thiết lập (Khuyên dùng)' : 'Đã thiết lập';
-  $('#st-qwenurl').textContent = s.qwen_url || '(Chưa cấu hình)';
+  $('#st-naikey').textContent = s.nai_key_required ? ('开启（' + (s.nai_key_masked || '') + '）') : '关闭（任意 key 可用）';
+  $('#st-chatfallback').textContent = ({ auto: 'auto（失败自动转聊天）', off: 'off（仅标准接口）', chat_only: 'chat_only（仅聊天接口）', openai: 'openai（标准 OpenAI 接口，无兜底）' })[s.chat_fallback] || s.chat_fallback;
+  $('#st-panelpw').textContent = AUTH.setup_required ? '未设置（建议设置）' : '已设置';
+  $('#st-qwenurl').textContent = s.qwen_url || '（未配置）';
   $('#st-qwenmodel').textContent = s.qwen_model || '-';
-  $('#st-qwenkey').textContent = s.qwen_key_set ? (s.qwen_key_masked || 'Đã thiết lập') : '(Chưa thiết lập)';
+  $('#st-qwenkey').textContent = s.qwen_key_set ? (s.qwen_key_masked || '已设置') : '（未设置）';
   $('#st-defaultsize').textContent = s.default_size || '-';
-  const base = '(Tích hợp sẵn trong extension · Không cần cấu hình địa chỉ)';
+  const base = '（内置扩展 · 无需配置地址）';
   $('#st-baseurl').textContent = base;
   $('#st-naikey-hint').innerHTML = s.nai_key_required
-    ? ('Điền key truy cập server (Hiện tại <span class="mono">' + esc(s.nai_key_masked || '') + '</span>; Nếu quên, bạn có thể thiết lập key mới trong "Trung tâm cài đặt")')
-    : 'Server không check key, client điền key bất kỳ khác rỗng là được';
+    ? ('填服务端接入密钥（当前 <span class="mono">' + esc(s.nai_key_masked || '') + '</span>；忘记可到「设置中心」重设一个新的）')
+    : '服务端未校验 key，客户端填任意非空 key 即可';
   $('#foot-version').textContent = 'V.Adapter ' + (r.data.version || '');
-  $('#pill-text').textContent = 'Trực tuyến';
+  $('#pill-text').textContent = '在线';
   renderRecent(r.data.recent || []);
 }
 
 function renderRecent(rows) {
   if (!rows.length) {
-    $('#recent-rows').innerHTML = '<tr><td colspan="7" class="muted" style="padding:14px 10px">Tạm thời chưa có lịch sử</td></tr>';
+    $('#recent-rows').innerHTML = '<tr><td colspan="7" class="muted" style="padding:14px 10px">暂无记录</td></tr>';
     return;
   }
   $('#recent-rows').innerHTML = rows.map(r => `<tr>
@@ -588,12 +605,12 @@ function renderRecent(rows) {
     <td class="mono">${esc(r.size)}</td>
     <td>${esc(r.via || '-')}</td>
     <td class="mono">${esc(r.latency_ms)}ms</td>
-    <td>${r.ok ? '<span class="tag ok">Thành công</span>' : '<span class="tag bad">Thất bại</span>'}</td>
+    <td>${r.ok ? '<span class="tag ok">成功</span>' : '<span class="tag bad">失败</span>'}</td>
     <td class="prompt">${esc(r.prompt || '')}</td>
   </tr>`).join('');
 }
 
-/* -- Cài đặt -- */
+/* ── 设置 ── */
 async function loadSettings() {
   const r = await api('/admin/settings');
   if (!r.ok || !r.data || !r.data.settings) return;
@@ -605,17 +622,17 @@ async function loadSettings() {
   $('#s-chat-fallback').value = s.chat_fallback || 'chat_only';
   $('#s-qwen-key').value = '';
   $('#s-nai-key').value = '';
-  $('#s-qwen-key').placeholder = s.qwen_key_set ? (s.qwen_key_masked + ' (Để trống nếu không đổi)') : '(Chưa cài đặt)';
-  $('#s-nai-key').placeholder = s.nai_key_required ? (s.nai_key_masked + ' (Để trống nếu không đổi)') : '(Không xác thực)';
+  $('#s-qwen-key').placeholder = s.qwen_key_set ? (s.qwen_key_masked + '（留空不改）') : '（未设置）';
+  $('#s-nai-key').placeholder = s.nai_key_required ? (s.nai_key_masked + '（留空不改）') : '（不校验）';
   $('#hint-qwen-key').textContent = s.qwen_key_set
-    ? ('Key hiện tại: ' + s.qwen_key_masked + '; Nhập giá trị mới để thay đổi, để trống = Không sửa.')
-    : 'Chưa cài đặt.';
+    ? ('当前 Key：' + s.qwen_key_masked + '；要更换请输入新值，留空 = 不修改。')
+    : '当前未设置。';
   $('#hint-nai-key').textContent = s.nai_key_required
-    ? ('Key hiện tại: ' + s.nai_key_masked + '; Phải điền giá trị này vào kênh của client, sau khi sửa hãy cập nhật đồng bộ cho client.')
-    : 'Đang tắt xác thực (Client điền key bất kỳ khác rỗng đều được).';
+    ? ('当前 Key：' + s.nai_key_masked + '；客户端渠道须填同一值，修改后请同步更新客户端。')
+    : '当前不校验（客户端填任意非空 key 均可）。';
   $('#hint-panel-pw').textContent = AUTH.setup_required
-    ? 'Chưa cài mật khẩu: Bất kỳ ai truy cập bảng điều khiển này cũng có thể thay đổi cấu hình; Bắt buộc phải cài đặt khi public ra internet.'
-    : 'Đã cài mật khẩu; Sau khi thay đổi thì phiên đăng nhập hiện tại vẫn có hiệu lực (24h).';
+    ? '未设置密码：任何人访问本面板都能改配置；公网部署请务必设置。'
+    : '已设置密码；修改后当前会话仍有效（24h）。';
 }
 
 async function saveSettings() {
@@ -632,26 +649,26 @@ async function saveSettings() {
   if (nk) payload.nai_key = nk;
 
   const btn = $('#btn-save');
-  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  btn.disabled = true; btn.textContent = '保存中…';
   const r = await api('/admin/settings', { method: 'POST', body: JSON.stringify(payload) });
-  btn.disabled = false; btn.textContent = 'Lưu cài đặt';
+  btn.disabled = false; btn.textContent = '保存设置';
   if (!r.ok || !r.data || !r.data.success) {
-    toast('Lưu thất bại: ' + ((r.data && r.data.error) || ('HTTP ' + r.status)), 'bad');
+    toast('保存失败：' + ((r.data && r.data.error) || ('HTTP ' + r.status)), 'bad');
     return;
   }
   const changed = r.data.changed || [];
   const notes = r.data.notes || [];
-  toast('Đã lưu và có hiệu lực ngay: ' + (changed.length ? changed.join(', ') : '(Nội dung không đổi)'));
+  toast('已保存并热生效：' + (changed.length ? changed.join('、') : '（内容无变化）'));
   notes.forEach(n => toast(n, 'bad'));
   await loadSettings();
   await loadStatus();
 }
 
-/* -- Test kết nối -- */
+/* ── 测试连接 ── */
 async function testConnection() {
   const btn = $('#btn-test');
-  btn.disabled = true; btn.textContent = 'Đang sinh ảnh... (Tối đa 300s)';
-  $('#test-result').innerHTML = '<span class="muted">Đang gọi API sinh ảnh tuyến trên, vui lòng chờ...</span>';
+  btn.disabled = true; btn.textContent = '生成中…（最长 300s）';
+  $('#test-result').innerHTML = '<span class="muted">正在调用上游生图，请稍候…</span>';
   $('#test-preview').style.display = 'none';
   const payload = {
     url: $('#t-url').value.trim(),
@@ -661,37 +678,37 @@ async function testConnection() {
   };
   Object.keys(payload).forEach(k => { if (!payload[k]) delete payload[k]; });
   const r = await api('/admin/test', { method: 'POST', body: JSON.stringify(payload) });
-  btn.disabled = false; btn.textContent = 'Test kết nối';
+  btn.disabled = false; btn.textContent = '测试连接';
   if (!r.ok || !r.data || !r.data.success) {
     const msg = (r.data && (r.data.error || r.data.message)) || ('HTTP ' + r.status);
     $('#test-result').innerHTML = '<span class="err">' + esc(msg) + '</span>';
-    toast('Test kết nối thất bại', 'bad');
+    toast('测试连接失败', 'bad');
     return;
   }
   const d = r.data;
-  $('#test-result').innerHTML = '<b>Sinh ảnh thành công</b>: Thời gian ' + esc(d.latency_ms) + 'ms, luồng <span class="tag info">' + esc(d.via) + '</span>, kích thước ' + esc(d.size) + ', model ' + esc(d.model) + ', ' + Math.round((d.bytes || 0) / 1024) + 'KB';
+  $('#test-result').innerHTML = '<b>生成成功</b>：耗时 ' + esc(d.latency_ms) + 'ms，链路 <span class="tag info">' + esc(d.via) + '</span>，尺寸 ' + esc(d.size) + '，模型 ' + esc(d.model) + '，' + Math.round((d.bytes || 0) / 1024) + 'KB';
   if (d.preview) {
     const img = $('#test-preview');
     const u = imgUrl(d.preview);
     img.onerror = () => showImgError(img, u);
     img.onload = () => { img.style.display = 'block'; };
-    // Ảnh từ xa bị tắt Referer: Tuyến trên có cơ chế chống trộm link (hotlinking), gắn thêm Referer địa chỉ SillyTavern là sẽ dính 403 ngay
+    // 远程图片禁用 Referer：上游 CDN 有防盗链，带酒馆地址的 Referer 一律 403
     img.referrerPolicy = 'no-referrer';
     img.src = u;
   }
-  toast('Test kết nối thành công (' + d.latency_ms + 'ms, ' + d.via + ')');
+  toast('测试连接成功（' + d.latency_ms + 'ms，' + d.via + '）');
   loadStatus(); loadLogs();
 }
 
-/* -- Lịch sử -- */
+/* ── 记录 ── */
 async function loadLogs() {
   const r = await api('/admin/logs?limit=200');
   if (!r.ok || !r.data) return;
   const rows = r.data.logs || [];
   const c = r.data.counters || {};
-  $('#logs-count').textContent = 'Tổng ' + (c.total || 0) + ' lần (Thành công ' + (c.success || 0) + ' / Thất bại ' + (c.fail || 0) + '), giới hạn lưu ' + (r.data.cap || 200) + ' mục';
+  $('#logs-count').textContent = '共 ' + (c.total || 0) + ' 次（成功 ' + (c.success || 0) + ' / 失败 ' + (c.fail || 0) + '），保留上限 ' + (r.data.cap || 200) + ' 条';
   if (!rows.length) {
-    $('#log-rows').innerHTML = '<tr><td colspan="8" class="muted" style="padding:14px 10px">Tạm thời chưa có lịch sử</td></tr>';
+    $('#log-rows').innerHTML = '<tr><td colspan="8" class="muted" style="padding:14px 10px">暂无记录</td></tr>';
     return;
   }
   $('#log-rows').innerHTML = rows.map(r0 => `<tr>
@@ -700,63 +717,63 @@ async function loadLogs() {
     <td class="mono">${esc(r0.size)}</td>
     <td>${esc(r0.via || '-')}</td>
     <td class="mono">${esc(r0.latency_ms)}ms</td>
-    <td>${r0.ok ? '<span class="tag ok">Thành công</span>' : '<span class="tag bad">Thất bại</span>'}</td>
+    <td>${r0.ok ? '<span class="tag ok">成功</span>' : '<span class="tag bad">失败</span>'}</td>
     <td class="prompt">${esc(r0.prompt || '')}</td>
     <td class="prompt err">${esc(r0.error || '')}</td>
   </tr>`).join('');
 }
 
-/* -- Binding (Móc nối) -- */
+/* ── 绑定 ── */
 $('#btn-save').onclick = saveSettings;
 $('#btn-test').onclick = testConnection;
 $('#btn-test-advanced').onclick = () => {
   const el = $('#test-advanced');
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 };
-$('#btn-refresh-overview').onclick = () => { loadStatus(); toast('Đã làm mới'); };
+$('#btn-refresh-overview').onclick = () => { loadStatus(); toast('已刷新'); };
 $('#btn-refresh-logs').onclick = () => loadLogs();
 $('#btn-clear-logs').onclick = async () => {
-  if (!confirm('Bạn có chắc chắn muốn xóa sạch lịch sử sinh ảnh?')) return;
+  if (!confirm('确定清空生成记录？')) return;
   await api('/admin/logs', { method: 'DELETE' });
-  toast('Đã xóa sạch lịch sử'); loadLogs(); loadStatus();
+  toast('记录已清空'); loadLogs(); loadStatus();
 };
 $('#btn-clear-qwen').onclick = () => clearKey('qwen_key');
 $('#btn-clear-nai').onclick = () => clearKey('nai_key');
 
-/* -- Biên dịch nhân vật (Xuất thẳng ảnh) -- */
+/* ── 角色转译（直接出图） ── */
 function trRenderText(d) {
   const item = (label, val) => val
     ? '<div style="margin-bottom:10px"><div class="muted" style="font-size:12px;margin-bottom:2px">' + label + '</div><div class="mono" style="white-space:pre-wrap;word-break:break-all;background:hsl(222 18% 14%);border-radius:6px;padding:8px 10px">' + esc(val) + '</div></div>'
     : '';
-  return item('Tổng Prompt', d.prompt) +
-    item('Mô tả nhân vật', d.character_prompt) +
-    item('Bối cảnh và Style', d.main_prompt) +
-    item('Từ khóa phủ định', d.negative_prompt);
+  return item('总提示词', d.prompt) +
+    item('角色描述', d.character_prompt) +
+    item('场景与画风', d.main_prompt) +
+    item('负面词', d.negative_prompt);
 }
 
 function trShowImage(d) {
   const img = $('#tr-image');
   const u = imgUrl(d.preview);
   img.onerror = () => showImgError(img, u);
-  // Ảnh từ xa bị tắt Referer: Tuyến trên có cơ chế chống trộm link (hotlinking), gắn thêm Referer địa chỉ SillyTavern là sẽ dính 403 ngay
+  // 远程图片禁用 Referer：上游 CDN 有防盗链，带酒馆地址的 Referer 一律 403
   img.referrerPolicy = 'no-referrer';
   img.src = u;
   $('#tr-image-wrap').style.display = 'block';
   const a = $('#btn-dl-image');
   a.href = u;
   a.setAttribute('download', 'translate.' + (d.ext || 'png'));
-  $('#tr-image-info').textContent = 'Thời gian ' + d.latency_ms + 'ms · Luồng ' + (d.via || '-') +
-    ' · Kích thước ' + (d.used_size || '-') + ' · ' + Math.round((d.bytes || 0) / 1024) + 'KB';
+  $('#tr-image-info').textContent = '耗时 ' + d.latency_ms + 'ms · 链路 ' + (d.via || '-') +
+    ' · 尺寸 ' + (d.used_size || '-') + ' · ' + Math.round((d.bytes || 0) / 1024) + 'KB';
 }
 
 async function runTranslate(generate) {
   const text = $('#tr-text').value.trim();
-  if (!text) { toast('Vui lòng nhập mô tả nhân vật hoặc bối cảnh', 'bad'); return; }
+  if (!text) { toast('请输入角色或场景描述', 'bad'); return; }
   const btnGen = $('#btn-translate-gen'), btnOnly = $('#btn-translate'), box = $('#tr-result');
   const labelGen = btnGen.textContent;
   btnGen.disabled = true; btnOnly.disabled = true;
-  if (generate) btnGen.textContent = 'Đang biên dịch và xuất ảnh... (Tối đa 320s)';
-  box.innerHTML = '<span class="muted">' + (generate ? 'Đang biên dịch và gọi API tuyến trên để xuất ảnh, vui lòng chờ...' : 'Đang biên dịch, vui lòng chờ...') + '</span>';
+  if (generate) btnGen.textContent = '转译并出图中…（最长 320s）';
+  box.innerHTML = '<span class="muted">' + (generate ? '正在转译并调用上游出图，请稍候…' : '正在转译，请稍候…') + '</span>';
   const payload = { text: text, generate: generate };
   const size = $('#tr-size').value;
   if (size) payload.size = size;
@@ -764,34 +781,34 @@ async function runTranslate(generate) {
   btnGen.disabled = false; btnOnly.disabled = false; btnGen.textContent = labelGen;
   if (!r.ok || !r.data || !r.data.success) {
     box.innerHTML = '<span class="err">' + esc((r.data && (r.data.error || r.data.message)) || ('HTTP ' + r.status)) + '</span>';
-    toast(generate ? 'Biên dịch và xuất ảnh thất bại' : 'Biên dịch thất bại', 'bad');
+    toast(generate ? '转译并出图失败' : '转译失败', 'bad');
     return;
   }
   const d = r.data.data || {};
   window.__tr = { data: d, used_size: r.data.used_size || '' };
   box.innerHTML = trRenderText(d) +
-    '<div class="muted" style="font-size:12px">Kích thước đề xuất: ' + esc((d.width || '') + 'x' + (d.height || '')) +
-    ' · Số bước ' + esc(d.steps || '-') + ' · CFG ' + esc(d.cfg_scale || '-') + '</div>';
+    '<div class="muted" style="font-size:12px">推荐尺寸：' + esc((d.width || '') + 'x' + (d.height || '')) +
+    ' · 步数 ' + esc(d.steps || '-') + ' · CFG ' + esc(d.cfg_scale || '-') + '</div>';
   if (r.data.preview) {
     trShowImage(r.data);
-    toast('Xuất ảnh thành công (' + r.data.latency_ms + 'ms, ' + (r.data.via || '-') + ')');
+    toast('出图完成（' + r.data.latency_ms + 'ms，' + (r.data.via || '-') + '）');
     loadStatus(); loadLogs();
   } else if (generate && r.data.image_error) {
-    box.innerHTML += '<div class="err" style="margin-top:8px">Biên dịch thành công, nhưng xuất ảnh thất bại: ' + esc(r.data.image_error) + '</div>';
-    toast('Biên dịch thành công, xuất ảnh thất bại', 'bad');
+    box.innerHTML += '<div class="err" style="margin-top:8px">转译成功，但出图失败：' + esc(r.data.image_error) + '</div>';
+    toast('转译成功，出图失败', 'bad');
   } else {
-    toast('Biên dịch thành công');
+    toast('转译完成');
   }
 }
 $('#btn-translate-gen').onclick = () => runTranslate(true);
 $('#btn-translate').onclick = () => runTranslate(false);
 
-// Sinh thêm tấm nữa: Tiếp tục dùng prompt của lần trước, không cần biên dịch lại (tránh bị lệch phong cách vẽ)
+// 再出一张：沿用上一次的提示词，不重新转译（避免画风漂移）
 $('#btn-regen').onclick = async () => {
   const prev = window.__tr;
-  if (!prev || !prev.data || !prev.data.prompt) { toast('Vui lòng thực hiện biên dịch một lần trước', 'bad'); return; }
+  if (!prev || !prev.data || !prev.data.prompt) { toast('请先转译一次', 'bad'); return; }
   const btn = $('#btn-regen');
-  btn.disabled = true; btn.textContent = 'Đang sinh ảnh...';
+  btn.disabled = true; btn.textContent = '生成中…';
   const payload = {
     prompt: prev.data.prompt,
     negative: prev.data.negative_prompt,
@@ -801,49 +818,49 @@ $('#btn-regen').onclick = async () => {
   const size = $('#tr-size').value || prev.used_size || '';
   if (size) payload.size = size;
   const r = await api('/admin/translate', { method: 'POST', body: JSON.stringify(payload) });
-  btn.disabled = false; btn.textContent = 'Sinh thêm tấm nữa (Cùng prompt)';
+  btn.disabled = false; btn.textContent = '再出一张（同提示词）';
   if (!r.ok || !r.data || !r.data.preview) {
     const msg = (r.data && (r.data.image_error || r.data.error || r.data.message)) || ('HTTP ' + r.status);
-    toast('Xuất ảnh thất bại: ' + msg, 'bad');
+    toast('出图失败：' + msg, 'bad');
     return;
   }
   trShowImage(r.data);
   window.__tr.used_size = r.data.used_size || size;
-  toast('Đã sinh thêm một tấm (' + r.data.latency_ms + 'ms)');
+  toast('已再出一张（' + r.data.latency_ms + 'ms）');
   loadStatus(); loadLogs();
 };
 
 $('#btn-copy-translate').onclick = () => {
-  if (!window.__tr) { toast('Hiện tại chưa có kết quả biên dịch', 'bad'); return; }
+  if (!window.__tr) { toast('还没有转译结果', 'bad'); return; }
   const d = window.__tr.data;
-  const text = ['Tổng Prompt:', d.prompt, '', 'Mô tả nhân vật:', d.character_prompt, '', 'Bối cảnh và Style:', d.main_prompt, '', 'Từ khóa phủ định:', d.negative_prompt, '', 'Kích thước đề xuất: ' + d.width + 'x' + d.height + ', Số bước: ' + d.steps].join('\n');
-  navigator.clipboard.writeText(text).then(() => toast('Đã copy vào clipboard'), () => toast('Copy thất bại, vui lòng bôi đen để copy thủ công', 'bad'));
+  const text = ['总提示词：', d.prompt, '', '角色描述：', d.character_prompt, '', '场景与画风：', d.main_prompt, '', '负面词：', d.negative_prompt, '', '推荐尺寸：' + d.width + 'x' + d.height + '，步数：' + d.steps].join('\n');
+  navigator.clipboard.writeText(text).then(() => toast('已复制到剪贴板'), () => toast('复制失败，请手动选择复制', 'bad'));
 };
 
 async function clearKey(name) {
-  const label = name === 'nai_key' ? 'Key kết nối' : 'API Key';
-  if (!confirm('Bạn có chắc chắn muốn xóa ' + label + '? ' + (name === 'nai_key' ? 'Xóa xong, client điền key bất kỳ cũng gọi được.' : 'Xóa xong, request sẽ dùng placeholder.'))) return;
+  const label = name === 'nai_key' ? '接入密钥' : 'API 密钥';
+  if (!confirm('确定清除' + label + '？' + (name === 'nai_key' ? '清除后客户端填任意 key 均可调用。' : '清除后请求会用占位符。'))) return;
   const r = await api('/admin/settings', { method: 'POST', body: JSON.stringify({ clear: [name] }) });
-  if (!r.ok || !r.data || !r.data.success) { toast('Xóa thất bại', 'bad'); return; }
-  toast(name + ' đã được xóa'); loadSettings(); loadStatus();
+  if (!r.ok || !r.data || !r.data.success) { toast('清除失败', 'bad'); return; }
+  toast(name + ' 已清除'); loadSettings(); loadStatus();
 }
 $('#btn-set-pw').onclick = async () => {
   const pw = $('#s-panel-pw').value;
   const r = await api('/admin/auth/setup', { method: 'POST', body: JSON.stringify({ password: pw }) });
-  if (!r.ok || !r.data || !r.data.success) { toast('Thiết lập thất bại: ' + ((r.data && r.data.error) || ''), 'bad'); return; }
+  if (!r.ok || !r.data || !r.data.success) { toast('设置失败：' + ((r.data && r.data.error) || ''), 'bad'); return; }
   $('#s-panel-pw').value = '';
   AUTH.setup_required = false;
-  toast('Đã cài đặt mật khẩu bảng điều khiển'); loadStatus();
+  toast('面板密码已设置'); loadStatus();
 };
 $('#btn-close-pw').onclick = async () => {
-  if (!confirm('Bạn có chắc chắn muốn tắt mật khẩu? Tắt xong bất kỳ ai truy cập vào bảng điều khiển này đều có thể sửa cấu hình.')) return;
+  if (!confirm('确定关闭面板密码？关闭后任何人访问本面板都能改配置。')) return;
   const r = await api('/admin/auth/setup', { method: 'POST', body: JSON.stringify({ password: '' }) });
-  if (!r.ok || !r.data || !r.data.success) { toast('Tắt thất bại: ' + ((r.data && r.data.error) || ''), 'bad'); return; }
+  if (!r.ok || !r.data || !r.data.success) { toast('关闭失败：' + ((r.data && r.data.error) || ''), 'bad'); return; }
   AUTH.setup_required = true;
-  toast('Đã tắt mật khẩu bảng điều khiển'); loadStatus(); loadSettings();
+  toast('面板密码已关闭'); loadStatus(); loadSettings();
 };
 
-/* -- Tự động làm mới và Khởi động -- */
+/* ── 轮询与启动 ── */
 async function loadAll() { await Promise.all([loadStatus(), loadSettings()]); loadLogs(); }
 
 setInterval(() => {

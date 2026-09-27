@@ -1,8 +1,8 @@
-// settings.js — Cài đặt có thể thay đổi lúc runtime (Bản Node server-side).
-// Port 1:1 từ V.Adapter (Go) settings.go:
-//   - Giá trị mặc định lúc khởi động config.json (Plugin này dùng data/config.json) + Ghi đè bằng biến môi trường (environment variables),
-//     Sau đó bị ghi đè bởi data/settings.json (Thay đổi trên bảng điều khiển có độ ưu tiên cao nhất, có hiệu lực ngay (hot-reload));
-//   - Quy tắc chuẩn hóa (normalization), quy tắc che giấu (masking), ngữ nghĩa các trường hoàn toàn nhất quán với bản Go.
+// settings.js - Cài đặt có thể thay đổi lúc chạy (Phiên bản Node server).
+// Port 1:1 từ settings.go của V.Adapter (Go):
+//   - Giá trị mặc định lúc khởi động config.json (Plugin này dùng data/config.json) + ghi đè bằng biến môi trường,
+//     sau đó bị ghi đè bởi data/settings.json (Thay đổi trên bảng điều khiển có độ ưu tiên cao nhất, áp dụng nóng);
+//   - Quy tắc chuẩn hóa, quy tắc che giấu (mask), ngữ nghĩa của các trường hoàn toàn giống hệt bản Go.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,25 +10,25 @@ import { fileURLToPath } from 'node:url';
 
 const pluginDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
-// VADAPTER_DATA_DIR do bootloader server inject, giúp giải phóng (decouple) dữ liệu hoạt động khỏi vị trí chứa code:
-// Code có thể cập nhật cùng extension vào thư mục bất kỳ, cấu hình luôn nằm ở vị trí do biến môi trường này trỏ tới.
+// VADAPTER_DATA_DIR được loader của server inject vào, giúp dữ liệu chạy và vị trí chứa code được tách biệt (decoupled):
+// Code có thể cập nhật cùng extension đến bất kỳ thư mục nào, nhưng cấu hình luôn nằm ở vị trí mà biến môi trường này chỉ định.
 const dataDir = process.env.VADAPTER_DATA_DIR
     ? path.resolve(process.env.VADAPTER_DATA_DIR)
     : path.join(pluginDir, 'data');
 const settingsPath = path.join(dataDir, 'settings.json');
 const configPath = path.join(dataDir, 'config.json');
 
-// Tương ứng 1:1 với các trường của startupConfig bản Go.
+// Tương ứng 1:1 với các trường của startupConfig trong bản Go.
 const DEFAULTS = {
     listen: '0.0.0.0:8888',
     qwen_url: 'http://127.0.0.1:4000/v1',
-    qwen_key: 'sk-Key_tuyến_trên_của_bạn',
+    qwen_key: 'sk-Secret key tuyến trên của bạn',
     qwen_model: 'qwen3.8-max',
     default_size: '1024x1024',
     nai_key: 'v-adapter-8888',
-    // Mặc định đi qua interface chat để sinh ảnh: Interface sinh ảnh tiêu chuẩn (/images/generations) khi bị Aliyun WAF của tuyến trên
-    // chặn lại vì rủi ro sẽ không khả dụng (trả về 429), trong khi interface chat lại ổn định khả dụng và cũng có thể sinh ảnh.
-    // Người dùng cần interface tiêu chuẩn có thể đổi lại thành auto / off / openai.
+    // Mặc định chạy qua API chat để tạo ảnh: API tạo ảnh tiêu chuẩn (/images/generations) khi bị Aliyun WAF
+    // của tuyến trên chặn kiểm soát rủi ro sẽ không khả dụng (trả về 429), trong khi API chat hoạt động ổn định và vẫn có thể tạo ảnh.
+    // Người dùng cần API tiêu chuẩn có thể đổi lại thành auto / off / openai.
     chat_fallback: 'chat_only',
 };
 
@@ -87,7 +87,7 @@ export function initSettings() {
     rt.listen = normalizeListenOrDefault(rt.listen);
 }
 
-// -- Công cụ chuẩn hóa (Nhất quán với bản Go) --
+// -- Công cụ chuẩn hóa (Giống hệt bản Go) --
 
 export function normalizeSizeStr(s) {
     s = String(s ?? '').toLowerCase().trim().replaceAll('×', 'x');
@@ -126,7 +126,7 @@ export function normalizeChatFallback(s) {
     }
 }
 
-// maskKey Che giấu Key: Key ngắn chỉ giữ lại ký tự đầu (Ví dụ 1 -> 1***), Key dài giữ 3 ký tự đầu và 2 ký tự cuối.
+// maskKey Che giấu Key: Key ngắn chỉ giữ lại ký tự đầu (ví dụ 1 -> 1***), key dài giữ 3 đầu 2 đuôi.
 export function maskKey(k) {
     k = String(k ?? '').trim();
     if (!k) return '';
@@ -146,7 +146,7 @@ export const settingsGet = {
     listen: () => rt.listen,
 };
 
-// settingsView Snapshot hiển thị cho Trung tâm cài đặt (Key thống nhất bị che giấu).
+// settingsView Snapshot hiển thị của trung tâm cài đặt (Toàn bộ Key đều bị che).
 export function settingsView() {
     return {
         qwen_url: rt.qwen_url,
@@ -170,7 +170,7 @@ function persist() {
     }
 }
 
-// applySettings Áp dụng cặp key-value do bảng điều khiển submit: Xác thực và có hiệu lực ngay, trả về [changed, notes].
+// applySettings Áp dụng cặp key-value do bảng điều khiển submit: Xác minh và áp dụng nóng, trả về [changed, notes].
 export function applySettings(body) {
     const changed = [], notes = [];
     const toStr = v => (typeof v === 'string' ? v : '');
@@ -193,7 +193,7 @@ export function applySettings(body) {
         else {
             const n = normalizeSizeStr(s);
             if (n) { if (n !== rt.default_size) { rt.default_size = n; changed.push('default_size'); } }
-            else notes.push('Định dạng default_size không hợp lệ (Nên là RộngxCao, ví dụ 832x1216), đã bỏ qua');
+            else notes.push('Định dạng default_size không hợp lệ (Phải là RộngxCao, ví dụ 832x1216), đã bỏ qua');
         }
     }
     if ('nai_key' in body) {
@@ -209,7 +209,7 @@ export function applySettings(body) {
         if (s && s !== rt.listen) {
             rt.listen = s;
             changed.push('listen');
-            notes.push('listen đã được lưu, khởi động lại SillyTavern để có hiệu lực');
+            notes.push('Đã lưu listen, khởi động lại SillyTavern để áp dụng');
         }
     }
     if (Array.isArray(body.clear)) {
@@ -220,7 +220,7 @@ export function applySettings(body) {
                 if (rt.nai_key !== '') {
                     rt.nai_key = '';
                     changed.push('nai_key');
-                    notes.push('nai_key đã bị làm trống: Client điền key bất kỳ đều có thể gọi (call)');
+                    notes.push('Đã xóa trắng nai_key: Client điền key bất kỳ đều có thể gọi API');
                 }
             }
         }
@@ -230,7 +230,7 @@ export function applySettings(body) {
     return [changed, notes];
 }
 
-// Hook reset trạng thái ngắt mạch (circuit breaker) (Được inject khi server.js khởi động, tránh phụ thuộc vòng tròn (circular dependency))
+// Hook reset ngắt mạch (Được inject khi server.js khởi động, tránh circular dependency)
 let _resetImagesBroken = () => {};
 export function bindResetImagesBroken(fn) { _resetImagesBroken = fn; }
-function resetImagesBroken() { try { _resetImagesBroken(); } catch { /* ignore */ } }
+function resetImagesBroken() { try { _resetImagesBroken(); } catch { /* Bỏ qua */ } }

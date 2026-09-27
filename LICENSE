@@ -22,9 +22,12 @@ SOFTWARE.
 
 ---
 
-Điều khoản bổ sung (Đi kèm với mã nguồn được xem như đã đồng ý; Các điều khoản dưới đây được ưu tiên áp dụng đối với những phần có xung đột trong điều khoản MIT ở trên):
+Điều khoản bổ sung (Đi kèm với mã nguồn, mặc định được coi là đã đồng ý; các điều khoản dưới đây được ưu tiên áp dụng so với những phần mâu thuẫn trong văn bản MIT ở trên):
 
-1. Cấm thương mại: Nếu chưa có sự ủy quyền bằng văn bản của tác giả, không được phép bán, cho thuê, tích hợp vào các sản phẩm hoặc dịch vụ thương mại, cũng không được phép trục lợi trực tiếp hoặc gián tiếp dưới bất kỳ hình thức nào như quảng cáo, nhận donate, triển khai có thu phí, dựng hộ (hosting)...
-2. Cho phép sử dụng cá nhân, học tập nghiên cứu, sao chép, sửa đổi (Sáng tác phái sinh) và lan truyền thứ cấp với mục đích phi thương mại; Khi sáng tác phái sinh và tái phân phối BẮT BUỘC phải giữ lại tên tác giả gốc (VILK) và tuyên bố license này.
-3. Dự án này chỉ dành cho mục đích học tập và nghiên cứu, vui lòng tuân thủ điều khoản dịch vụ (TOS) của tuyến trên được kết nối, người dùng tự chịu rủi ro khi sử dụng.
-4. Bản phần mềm này được cung cấp theo "Nguyên trạng" (As is), không kèm theo bất kỳ bảo đảm rõ ràng hay ngầm định nào, tác giả không chịu trách nhiệm cho bất kỳ hậu quả nào phát sinh từ việc sử dụng chương trình này.
+1. Cấm thương mại hóa: Khi chưa có sự cho phép bằng văn bản của tác giả, không được phép bán, cho thuê, tích hợp vào các sản phẩm hoặc dịch vụ thương mại,
+   cũng không được trục lợi trực tiếp hoặc gián tiếp dưới bất kỳ hình thức nào như quảng cáo, nhận donate, thu phí triển khai, dựng thuê.
+2. Cho phép sử dụng cá nhân, học tập nghiên cứu, sao chép, chỉnh sửa (sáng tác phái sinh) và phân phối lại với mục đích phi thương mại;
+   khi sáng tác phái sinh và phân phối lại, bắt buộc phải giữ lại chữ ký của tác giả gốc (VILK) cùng với tuyên bố cấp phép này.
+3. Dự án này chỉ dành cho mục đích học tập và nghiên cứu, vui lòng tuân thủ điều khoản dịch vụ của tuyến trên đã kết nối, người dùng tự chịu rủi ro.
+4. Phần mềm này được cung cấp theo nguyên trạng "như hiện có", không đi kèm bất kỳ bảo đảm rõ ràng hay ngụ ý nào,
+   tác giả không chịu trách nhiệm cho bất kỳ hậu quả nào phát sinh từ việc sử dụng chương trình này.

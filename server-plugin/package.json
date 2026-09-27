@@ -3,5 +3,5 @@
     "version": "1.1.5",
     "private": true,
     "type": "module",
-    "description": "V.Adapter - Dịch vụ adapter giao thức NovelAI (Hình thái server plugin SillyTavern)"
+    "description": "V.Adapter - Service chuyển đổi giao thức NovelAI (Hình thái plugin server SillyTavern)"
 }

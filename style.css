@@ -1,6 +1,6 @@
-/* Style extension V.Adapter SillyTavern (Ngăn extension + Overlay bảng quản lý) */
+/* V.Adapter Style mở rộng cho SillyTavern (Ngăn kéo extension + Lớp phủ bảng quản lý) */
 
-/* -- Ngăn extension (Khởi động/Dừng dịch vụ giao thức + Tên + Phiên bản + Mở bảng điều khiển) -- */
+/* -- Ngăn kéo extension (Bật/tắt service giao thức + Tên + Phiên bản + Mở bảng quản lý) -- */
 #v_adapter_drawer .v_adapter_version {
     font-size: 11px;
     color: var(--SmartThemeBodyColor);
@@ -23,7 +23,7 @@
     align-items: center;
 }
 
-/* Các nút trong ngăn extension đồng loạt chiếm toàn bộ dòng và căn giữa, nếu không sẽ bị nén thành xếp dọc. */
+/* Các nút trong ngăn kéo đều chiếm trọn hàng và căn giữa, nếu không sẽ bị ép thành xếp dọc. */
 #v_adapter_drawer #v_adapter_open_panel,
 #v_adapter_drawer #v_adapter_svc_toggle,
 #v_adapter_drawer #v_adapter_svc_reload {
@@ -31,7 +31,7 @@
     justify-content: center;
 }
 
-/* Khối dịch vụ giao thức mặc định bị ẩn: Kênh xuất ảnh chính không phụ thuộc vào nó, khi chưa deploy thì không nên xuất hiện cảm giác "Chưa cài đặt". */
+/* Khối service giao thức mặc định ẩn: Luồng tạo ảnh chính không phụ thuộc vào nó, khi chưa deploy thì không nên xuất hiện giao diện kiểu "Chưa cài đặt". */
 #v_adapter_drawer .v_adapter_svc_block {
     display: none;
     flex-direction: column;
@@ -82,10 +82,10 @@
     background: var(--SmartThemeBlurTintColor, rgba(127, 127, 127, 0.18));
 }
 
-/* -- Overlay bảng quản lý --
-   Kích thước được quyết định hoàn toàn bởi độ lệch (offset) trên/dưới/trái/phải của absolute positioning, không sử dụng chiều cao phần trăm (percentage height) hoặc flexbox:
-   Trình duyệt điện thoại và WebView trong app có sự khác biệt lớn khi phân tích position: fixed + chiều cao phần trăm,
-   việc fix cứng độ lệch có thể đảm bảo thiết bị nào cũng lấy được khu vực hiển thị khác 0. */
+/* -- Lớp phủ bảng quản lý --
+   Kích thước hoàn toàn được quyết định bởi độ lệch trên dưới trái phải của định vị tuyệt đối (absolute positioning), không dùng chiều cao phần trăm hay co giãn linh hoạt:
+   Trình duyệt di động và WebView trong ứng dụng có sự khác biệt lớn khi parse fixed positioning + chiều cao phần trăm,
+   Việc fix cứng độ lệch có thể đảm bảo mọi nền tảng đều có được vùng nhìn thấy khác 0. */
 #v_adapter_panel_overlay {
     --va-pad: 24px;
     --va-chrome: 30px;
@@ -94,16 +94,16 @@
     top: 0;
     left: 0;
     width: 100%;
-    /* Không thể dùng độ lệch top/bottom hoặc chiều cao phần trăm: SillyTavern trên mobile set body thành position: fixed,
-       2 thuộc tính này trên Chromium Android sẽ bị phân tích thành chiều cao = 0, overlay bị ép bẹp, nội dung bảng không thể nhìn thấy.
-       100vh và giá trị pixel do JS gán đều có thể lấy được full chiều cao trên cả mobile và desktop. */
+    /* Không thể dùng độ lệch top/bottom hoặc chiều cao phần trăm: SillyTavern trên thiết bị di động set body thành position: fixed,
+       cả hai cách này trên Android Chromium sẽ bị parse thành chiều cao 0, lớp phủ bị ép bẹp, nội dung bảng không nhìn thấy được.
+       100vh và giá trị pixel gán bằng JS có thể lấy được chiều cao full màn hình trên cả thiết bị di động và desktop. */
     height: 100vh;
     z-index: 9999;
     background: rgba(0, 0, 0, 0.75);
     box-sizing: border-box;
 }
 
-/* Màn hình hẹp (Mobile): Overlay full màn hình, chỉ giữ lại một thanh thao tác, nội dung bảng hiển thị full chiều rộng */
+/* Màn hình hẹp (Điện thoại): Lớp phủ chiếm trọn màn hình, chỉ giữ lại một thanh thao tác, nội dung bảng hiển thị full chiều rộng */
 @media (max-width: 720px) {
     #v_adapter_panel_overlay {
         --va-pad: 0px;
@@ -161,8 +161,8 @@
     position: absolute;
     top: calc(var(--va-chrome) + var(--va-gap));
     left: var(--va-pad);
-    /* iframe là replaced element: width/height lấy auto sẽ lùi về kích thước vốn có là 300x150,
-       độ lệch trái phải cũng bị vô hiệu hóa theo, do đó ở đây tính toán kích thước một cách rõ ràng (explicit). */
+    /* iframe là replaced element: width/height đặt auto sẽ lùi về kích thước nội tại 300x150,
+       độ lệch trái phải cũng sẽ mất tác dụng theo, do đó ở đây phải tính toán kích thước rõ ràng. */
     width: calc(100% - var(--va-pad) * 2);
     height: calc(100% - var(--va-chrome) - var(--va-gap) - var(--va-pad));
     border: none;
@@ -171,7 +171,7 @@
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
-/* Gợi ý dự phòng (fallback) khi nhúng thất bại (Một số trình duyệt mobile và WebView trong app cấm iframe) */
+/* Thông báo dự phòng khi nhúng load thất bại (Một số trình duyệt di động và WebView trong ứng dụng cấm iframe) */
 #v_adapter_panel_overlay #v_adapter_panel_fallback {
     display: none;
     position: absolute;

@@ -1,14 +1,14 @@
-// server.js — Dịch vụ HTTP nhúng (Gộp route + CORS).
+// server.js - Service HTTP nhúng (Lắp ráp router + CORS).
 //
-// Tương ứng với main() của main.go bản Go: Gộp các endpoint giao thức NAI, endpoint bảng quản lý, bảng điều khiển nhúng single-file
-// vào một **port lắng nghe độc lập** (Mặc định 8888, có thể đổi trên bảng điều khiển, khởi động lại sẽ có hiệu lực).
+// Tương ứng với main() của main.go trong bản Go: Lắp ráp các endpoint giao thức NAI, endpoint bảng quản lý, bảng điều khiển file đơn nhúng
+// vào một **port listen độc lập** (mặc định 8888, có thể sửa trên bảng điều khiển, khởi động lại để áp dụng).
 //
-// Nguyên nhân sử dụng port lắng nghe độc lập thay vì route của chính SillyTavern: Phía server của SillyTavern có bảo vệ CSRF, client bên thứ ba
-// trực tiếp gửi request đến route plugin của SillyTavern sẽ bị chặn 403. Việc plugin tự mở port có thể lách giới hạn này, đồng thời **giữ nguyên cách kết nối của bản gốc**
-// (URL kênh NovelAI của client vẫn điền IP:8888, không cần sửa).
+// Lý do sử dụng port listen độc lập thay vì router của chính SillyTavern: Server SillyTavern có bảo vệ CSRF, client bên thứ ba
+// gửi request trực tiếp đến router plugin của SillyTavern sẽ bị chặn 403. Plugin tự mở port có thể lách giới hạn này, đồng thời **giữ nguyên cách thức kết nối của bản gốc**
+// (URL channel NovelAI của client vẫn điền IP:8888, không cần chỉnh sửa).
 //
-// Danh sách route:
-//   POST /ai/generate-image     NAI Sinh ảnh -> ZIP (Cần nai_key)
+// Danh sách các route:
+//   POST /ai/generate-image     Tạo ảnh NAI -> ZIP (Cần nai_key)
 //   GET  /ai/user/subscription  Test kết nối (Cần nai_key)
 //   POST /ai/encode-vibe        Không hỗ trợ -> 404
 //   GET  /admin/*               Endpoint bảng quản lý (Xem admin.js)
@@ -35,9 +35,9 @@ let server = null;
 let boundListen = '';
 let started = false;
 
-// -- Ngữ cảnh request (Processor của nai.js gọi theo (req, res, ctx)) --
+// -- Context request (Các handler của nai.js được gọi theo (req, res, ctx)) --
 
-// readBody Đọc toàn bộ request body (Giới hạn maxBytes), trả về Buffer.
+// readBody Đọc toàn bộ body request (giới hạn maxBytes), trả về Buffer.
 function readBody(req, maxBytes = 32 << 20) {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -45,7 +45,7 @@ function readBody(req, maxBytes = 32 << 20) {
         req.on('data', (c) => {
             size += c.length;
             if (size > maxBytes) {
-                reject(new Error('Request body quá lớn'));
+                reject(new Error('Body request quá lớn'));
                 req.destroy();
                 return;
             }
@@ -56,7 +56,7 @@ function readBody(req, maxBytes = 32 << 20) {
     });
 }
 
-// ctxFor Khởi tạo ngữ cảnh processor theo request (Trong nai.js gọi là ctx.readBody(giới hạn), không truyền req) --
+// ctxFor Xây dựng context của handler dựa theo request (Trong nai.js gọi là ctx.readBody(giới hạn), không truyền req) -
 // Do đó readBody bắt buộc phải bind trước với request hiện tại.
 function ctxFor(req) {
     return {
@@ -65,13 +65,13 @@ function ctxFor(req) {
     };
 }
 
-// -- Bảng điều khiển nhúng: Inject cầu nối API --
+// -- Bảng điều khiển nhúng: Inject API bridge --
 
 let panelHTMLCache = null;
 
-// panel.html vốn dĩ dành cho "Bản extension", nó gửi request qua window.parent.__V_ADAPTER_API__.
-// Dưới hình thái server-side, bảng điều khiển được mở trực tiếp (window.parent === window), do đó trong HTML trả về
-// sẽ inject trước một cầu nối cùng tên (Chuyển sang đi qua HTTP thực sự), **bản thân panel.html không cần sửa một dòng nào**.
+// panel.html ban đầu được dùng cho "bản extension", nó gửi request thông qua window.parent.__V_ADAPTER_API__.
+// Ở hình thái server, bảng điều khiển được mở trực tiếp (window.parent === window), do đó trong HTML trả về
+// sẽ inject trước một bridge cùng tên (chuyển sang dùng HTTP thực sự), **bản thân panel.html không cần sửa một dòng nào**.
 const API_SHIM = `<script>
 window.__V_ADAPTER_API__ = (function () {
     return async function (path, method, body) {
@@ -86,7 +86,7 @@ window.__V_ADAPTER_API__ = (function () {
             try { data = await r.json(); } catch (e) { data = null; }
             return { ok: r.ok, status: r.status, data: data };
         } catch (e) {
-            return { ok: false, status: 0, data: { success: false, error: 'Kết nối dịch vụ local thất bại: ' + e.message } };
+            return { ok: false, status: 0, data: { success: false, error: 'Kết nối service local thất bại: ' + e.message } };
         }
     };
 })();
@@ -104,7 +104,7 @@ function loadPanel() {
         }
         panelHTMLCache = html;
     } catch (e) {
-        panelHTMLCache = `<pre>Đọc bảng quản lý thất bại: ${e.message}\nFile kỳ vọng: ${panelPath}</pre>`;
+        panelHTMLCache = `<pre>Đọc bảng quản lý thất bại: ${e.message}\nFile mong đợi: ${panelPath}</pre>`;
     }
     return panelHTMLCache;
 }
@@ -115,7 +115,7 @@ function applyCors(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept');
-    // Trình duyệt (Bảng điều khiển V.Canvas, v.v...) cần đọc các header này mới có thể lấy được prompt và thông tin luồng thực tế gửi lên tuyến trên.
+    // Phía trình duyệt (Bảng điều khiển V.Canvas, v.v.) cần đọc các header này để lấy prompt thực tế gửi lên tuyến trên và thông tin luồng.
     res.setHeader('Access-Control-Expose-Headers', 'X-Illust-Via, X-Illust-Prompt, X-Illust-Expand');
     res.setHeader('Access-Control-Max-Age', '86400');
 }
@@ -174,7 +174,7 @@ async function route(req, res) {
 // -- Khởi động / Dừng --
 
 /**
- * startAdapterService Khởi động dịch vụ adapter nhúng (Do init của server plugin SillyTavern gọi).
+ * startAdapterService Khởi động service chuyển đổi nhúng (Được gọi bởi init của server plugin SillyTavern).
  * Port lấy từ listen của settings (Mặc định 0.0.0.0:8888).
  */
 export async function startAdapterService() {
@@ -196,7 +196,7 @@ export async function startAdapterService() {
             return;
         }
         route(req, res).catch(err => {
-            logf(`[HTTP] Xử lý ${req.method} ${req.url} gặp lỗi: ${err?.message ?? err}`);
+            logf(`[HTTP] Lỗi khi xử lý ${req.method} ${req.url}: ${err?.message ?? err}`);
             if (!res.headersSent) writeJSON(res, 500, { message: 'Lỗi nội bộ: ' + (err?.message ?? err) });
             else res.end();
         });
@@ -212,9 +212,9 @@ export async function startAdapterService() {
 
         server.once('error', (err) => {
             const hint = (err && err.code === 'EADDRINUSE')
-                ? `: Port ${port} đã bị chiếm dụng (Có thể bản Go V.Adapter hoặc instance khác vẫn đang chạy, vui lòng dừng lại rồi khởi động lại SillyTavern)`
+                ? `: Port ${port} đã bị chiếm dụng (Có thể bản Go của V.Adapter hoặc instance khác vẫn đang chạy, vui lòng tắt trước rồi khởi động lại SillyTavern)`
                 : `: ${err?.message ?? err}`;
-            logf(`[Startup] ✗ Dịch vụ adapter khởi động thất bại${hint}`);
+            logf(`[Startup] ✗ Khởi động service chuyển đổi thất bại${hint}`);
             server = null;
             finish();
         });
@@ -222,8 +222,8 @@ export async function startAdapterService() {
         server.listen(port, host, () => {
             boundListen = listen;
             started = true;
-            logf(`[Startup] ✓ Dịch vụ adapter đã khởi động: http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/  (Bảng quản lý)`);
-            logf(`[Startup] Kết nối client: URL kênh NovelAI điền http://<IP máy bạn>:${port} (Không kèm /ai), Key điền nai_key của server`);
+            logf(`[Startup] ✓ Service chuyển đổi đã khởi động: http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/  (Bảng quản lý)`);
+            logf(`[Startup] Kết nối client: URL channel NovelAI điền http://<IP máy hiện tại>:${port} (Không kèm /ai), Key điền nai_key của server`);
             logf(`[Startup] Tuyến trên: ${settingsGet.qwenURL() || '(Chưa cấu hình)'} | Model: ${settingsGet.qwenModel() || '-'} | Luồng: ${settingsGet.chatFallback()}`);
             finish();
         });
@@ -232,7 +232,7 @@ export async function startAdapterService() {
     return { listen: boundListen };
 }
 
-/** stopAdapterService Dừng dịch vụ nhúng (Gọi khi SillyTavern thoát). */
+/** stopAdapterService Dừng service nhúng (Được gọi khi SillyTavern thoát). */
 export async function stopAdapterService() {
     if (!server) {
         started = false;
@@ -248,7 +248,7 @@ export async function stopAdapterService() {
         } catch {
             resolve();
         }
-        // Dự phòng: Trong 1.5s chưa đóng sạch thì ép ngắt kết nối (Nếu không SillyTavern khi thoát sẽ bị treo)
+        // Dự phòng: Trong vòng 1.5s nếu chưa đóng sạch thì ngắt ép buộc (nếu không khi SillyTavern thoát sẽ bị kẹt)
         setTimeout(() => {
             try { s.closeAllConnections?.(); } catch { /* Bỏ qua */ }
             resolve();
@@ -256,7 +256,7 @@ export async function stopAdapterService() {
     });
 }
 
-/** getAdapterStatus Trạng thái read-only dành cho route /api/plugins/v-adapter/status của SillyTavern sử dụng. */
+/** getAdapterStatus Trạng thái read-only dành cho router /api/plugins/v-adapter/status của SillyTavern. */
 export function getAdapterStatus() {
     return {
         running: started,

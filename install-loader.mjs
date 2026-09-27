@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// install-loader.mjs -- Tự động triển khai bootloader server V.Adapter.
+// install-loader.mjs -- Tự động deploy loader của plugin server V.Adapter.
 //
-// Làm ba việc, tất cả đều tự động hoàn thành, không cần chỉnh sửa thủ công bất kỳ file nào:
-//   1) Định vị thư mục gốc của SillyTavern (Mặc định tìm ngược lên từ vị trí của script này, cũng có thể dùng tham số dòng lệnh hoặc ST_ROOT để chỉ định)
+// Thực hiện 3 việc, tất cả đều tự động, không cần chỉnh sửa thủ công bất kỳ file nào:
+//   1) Định vị thư mục gốc SillyTavern (mặc định tìm ngược lên trên từ vị trí script này, cũng có thể chỉ định bằng tham số dòng lệnh hoặc ST_ROOT)
 //   2) Copy bootstrap/ vào <SillyTavern>/plugins/V.Adapter/
-//   3) Đổi enableServerPlugins của config.yaml thành true (File gốc sẽ tự động backup)
+//   3) Sửa enableServerPlugins trong config.yaml thành true (Tự động sao lưu file gốc)
 //
 // Cách dùng:
 //   node install-loader.mjs                 // Tự động định vị
 //   node install-loader.mjs /path/to/ST     // Chỉ định thủ công thư mục gốc SillyTavern
 //
-// Hoàn tất xong cần khởi động lại SillyTavern một lần, sau đó "Dịch vụ giao thức" sẽ tự động khởi động cùng SillyTavern, không cần thêm bất kỳ cấu hình nào nữa.
+// Sau khi hoàn tất cần khởi động lại SillyTavern một lần, sau đó "Service giao thức" sẽ tự động khởi động cùng SillyTavern, không cần cấu hình thêm.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,7 +39,7 @@ function findStRoot() {
     if (process.env.ST_ROOT && isStRoot(process.env.ST_ROOT)) {
         return path.resolve(process.env.ST_ROOT);
     }
-    // Khi script này nằm ở <ST>/data/<user>/extensions/<extension>/, lùi lên 4 cấp chính là thư mục gốc
+    // Khi script này nằm ở <ST>/data/<user>/extensions/<extension>/, lùi lên trên 4 cấp sẽ là thư mục gốc
     let cur = here;
     for (let i = 0; i < 6; i++) {
         cur = path.dirname(cur);
@@ -59,7 +59,7 @@ if (!stRoot) {
 
 log('Thư mục SillyTavern: ' + stRoot);
 
-// 2) Copy bootloader
+// 2) Copy loader
 if (!fs.existsSync(path.join(bootDir, 'index.js'))) {
     log('[Thất bại] Không tìm thấy bootstrap/index.js, vui lòng chạy script này từ bên trong thư mục extension.');
     process.exit(1);
@@ -69,9 +69,9 @@ const pluginDir = path.join(stRoot, 'plugins', PLUGIN_NAME);
 fs.mkdirSync(path.join(pluginDir, 'data'), { recursive: true });
 fs.copyFileSync(path.join(bootDir, 'index.js'), path.join(pluginDir, 'index.js'));
 fs.copyFileSync(path.join(bootDir, 'package.json'), path.join(pluginDir, 'package.json'));
-log('Bootloader đã được cài đặt: ' + pluginDir);
+log('Loader đã được cài đặt: ' + pluginDir);
 
-// 3) Bật server plugin
+// 3) Bật plugin server
 const cfgPath = path.join(stRoot, 'config.yaml');
 let cfg = fs.readFileSync(cfgPath, 'utf8');
 const m = cfg.match(/^(\s*enableServerPlugins:\s*)(false|true)\s*$/m);
@@ -82,18 +82,18 @@ if (!m) {
     fs.copyFileSync(cfgPath, bak);
     cfg = cfg.replace(/\s*$/, '\n') + '\nenableServerPlugins: true\n';
     fs.writeFileSync(cfgPath, cfg);
-    log('Đã thêm vào enableServerPlugins: true (Backup: ' + bak + ')');
+    log('Đã thêm enableServerPlugins: true (Bản backup: ' + bak + ')');
 } else if (m[2] === 'true') {
-    log('config.yaml đã bật server plugin, không cần thay đổi gì thêm.');
+    log('config.yaml đã bật plugin server, không cần thay đổi.');
 } else {
     const bak = cfgPath + '.bak-' + new Date().toISOString().replace(/[:.]/g, '-');
     fs.copyFileSync(cfgPath, bak);
     cfg = cfg.replace(/^(\s*enableServerPlugins:\s*)false\s*$/m, '$1true');
     fs.writeFileSync(cfgPath, cfg);
-    log('config.yaml đã được đổi thành enableServerPlugins: true (Backup: ' + bak + ')');
+    log('config.yaml đã được sửa thành enableServerPlugins: true (Bản backup: ' + bak + ')');
 }
 
 log('');
 log('Hoàn tất. Bước tiếp theo: Khởi động lại SillyTavern một lần.');
-log('Sau khi khởi động lại, "Dịch vụ giao thức" trong ngăn extension sẽ tự động khởi động cùng SillyTavern;');
-log('Chỉ khi nào cần dùng plugin sinh ảnh SillyTavern của bên thứ ba thì mới cần đến nó, V.Canvas mặc định sẽ đi qua kết nối trực tiếp trong trang.');
+log('Sau khi khởi động lại, "Service giao thức" trong ngăn kéo extension sẽ tự động khởi động cùng SillyTavern;');
+log('Chỉ cần nó khi sử dụng plugin tạo ảnh SillyTavern của bên thứ ba, V.Canvas mặc định kết nối trực tiếp trong trang.');

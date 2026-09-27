@@ -1,16 +1,16 @@
-// admin.js — Endpoint của bảng quản lý (Tổng quan hoạt động / Trung tâm cài đặt / Test kết nối / Preset art style / Biên dịch nhân vật / Lịch sử sinh ảnh)
-//             + Đăng nhập bảng điều khiển (Lần đầu miễn mật khẩu, có thể đặt mật khẩu).
-// Port 1:1 từ admin.go + auth.go + handleAdminSettings trong settings.go của V.Adapter (Go).
+// admin.js - Endpoint bảng quản lý (Tổng quan hoạt động / Trung tâm cài đặt / Test kết nối / Preset phong cách / Dịch nhân vật / Lịch sử tạo)
+//             + Đăng nhập bảng điều khiển (Mở lần đầu không cần mật khẩu, có thể cài mật khẩu).
+// Port 1:1 từ handleAdminSettings trong admin.go + auth.go + settings.go của V.Adapter (Go).
 //
-// Danh sách route (5 route đầu yêu cầu đăng nhập bảng điều khiển; khi chưa đặt mật khẩu thì cho qua (pass) toàn bộ, do bảng điều khiển hướng dẫn thiết lập):
-//   GET    /admin/status            Trạng thái hoạt động + Cấu hình đã che giấu (masked) + Lịch sử gần nhất (**Công khai**, cùng cấp với /health)
-//   GET    /admin/settings          Đọc cài đặt (Key đã che giấu)
-//   POST   /admin/settings          Ghi cài đặt (Có hiệu lực ngay (hot-reload) và lưu vào ổ đĩa data/settings.json)
-//   POST   /admin/test              Gọi thực tế API sinh ảnh tuyến trên 1 lần, trả về ảnh xem trước
-//   POST   /admin/translate         Biên dịch nhân vật (Tùy chọn kèm theo xuất ảnh)
-//   GET    /admin/logs?limit=N      Lịch sử sinh ảnh   /  DELETE /admin/logs  Xóa sạch
-//   GET    /admin/auth/status       Trạng thái đăng nhập (Công khai, dùng cho mặt nạ đăng nhập)
-//   POST   /admin/auth/login        Đăng nhập          /admin/auth/setup  Thiết lập/Sửa đổi/Tắt mật khẩu
+// Danh sách các route (5 route đầu yêu cầu đăng nhập bảng điều khiển; khi chưa cài mật khẩu thì bỏ qua toàn bộ, do bảng điều khiển hướng dẫn cài đặt):
+//   GET    /admin/status            Trạng thái chạy + Cấu hình đã che (mask) + Lịch sử gần đây (**Công khai**, cùng cấp với /health)
+//   GET    /admin/settings          Đọc cài đặt (Key đã được che)
+//   POST   /admin/settings          Ghi cài đặt (Áp dụng nóng và lưu ra ổ đĩa vào data/settings.json)
+//   POST   /admin/test              Gọi thực tế API tạo ảnh tuyến trên một lần, trả về ảnh preview
+//   POST   /admin/translate         Dịch nhân vật (Có thể tùy chọn xuất ảnh kèm theo)
+//   GET    /admin/logs?limit=N      Lịch sử tạo   /  DELETE /admin/logs  Xóa sạch
+//   GET    /admin/auth/status       Trạng thái đăng nhập (Công khai, dùng để hiển thị mask đăng nhập)
+//   POST   /admin/auth/login        Đăng nhập          /admin/auth/setup  Cài đặt/Đổi/Tắt mật khẩu
 //   POST   /admin/auth/logout       Đăng xuất
 
 import fs from 'node:fs';
@@ -27,15 +27,15 @@ const pluginDir = path.dirname(path.dirname(fileURLToPath(import.meta.url))); //
 const dataDir = path.join(pluginDir, 'data');
 const authPath = path.join(dataDir, 'auth.json');
 
-// -- Thông tin lúc runtime (Inject khi server.js khởi động, tránh phụ thuộc vòng tròn (circular dependency)) --
+// -- Thông tin lúc chạy (Được inject khi server.js khởi động, tránh circular dependency) --
 let runtime = { version: '-', startedAt: new Date() };
 export function setRuntime(info) {
     runtime = { ...runtime, ...info };
 }
 
-// -- Công cụ tiện ích response --
+// -- Tiện ích phản hồi --
 
-// writeJSON Thống nhất output JSON (Lỗi endpoint NovelAI dùng {"message": ...}, endpoint bảng điều khiển dùng {success,error}).
+// writeJSON Thống nhất đầu ra JSON (Endpoint NovelAI dùng {"message": ...} khi có lỗi, endpoint bảng điều khiển dùng {success,error}).
 export function writeJSON(res, code, obj) {
     const body = JSON.stringify(obj);
     res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -46,7 +46,7 @@ function writeAdminErr(res, code, msg) {
     writeJSON(res, code, { success: false, error: msg });
 }
 
-// readJsonBody Đọc request body và phân tích JSON (Body rỗng trả về null).
+// readJsonBody Đọc body request và parse JSON (Body rỗng trả về null).
 function readJsonBody(req, maxBytes = 8 << 20) {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -54,7 +54,7 @@ function readJsonBody(req, maxBytes = 8 << 20) {
         req.on('data', (c) => {
             size += c.length;
             if (size > maxBytes) {
-                reject(new Error('Request body quá lớn'));
+                reject(new Error('Body request quá lớn'));
                 req.destroy();
                 return;
             }
@@ -66,7 +66,7 @@ function readJsonBody(req, maxBytes = 8 << 20) {
             try {
                 resolve(JSON.parse(text));
             } catch (e) {
-                reject(new Error('Request body không phải là JSON hợp lệ: ' + e.message));
+                reject(new Error('Body request không phải JSON hợp lệ: ' + e.message));
             }
         });
         req.on('error', reject);
@@ -79,12 +79,12 @@ function toStr(v) {
     return String(v);
 }
 
-// -- Đăng nhập bảng điều khiển (Tương ứng auth.go) --
+// -- Đăng nhập bảng quản lý (Tương ứng với auth.go) --
 
 const PANEL_COOKIE = 'v_adapter_panel';
 const PANEL_TTL_MS = 24 * 60 * 60 * 1000;
 
-let authHash = '';                  // Rỗng = Chưa đặt mật khẩu (Cho qua toàn bộ /admin/*)
+let authHash = '';                  // Rỗng = Chưa cài mật khẩu (Bỏ qua toàn bộ /admin/*)
 const sessions = new Map();         // token -> Timestamp hết hạn(ms)
 
 function hashPassword(pw) {
@@ -101,7 +101,7 @@ function readCookies(req) {
     return out;
 }
 
-// initAuth Load mật khẩu bảng điều khiển khi khởi động (Được gọi trước khi route tiếp quản).
+// initAuth Load mật khẩu bảng điều khiển lúc khởi động (Gọi trước khi router tiếp quản).
 export function initAuth() {
     try {
         if (fs.existsSync(authPath)) {
@@ -112,7 +112,7 @@ export function initAuth() {
         }
     } catch (e) {
         authHash = '';
-        console.log(`[V.Adapter] Đọc mật khẩu bảng điều khiển thất bại (Xử lý như chưa thiết lập): ${e.message}`);
+        console.log(`[V.Adapter] Đọc mật khẩu bảng điều khiển thất bại (Xử lý như chưa cài đặt): ${e.message}`);
     }
 }
 
@@ -179,11 +179,11 @@ async function handleAuthLogin(req, res) {
         return;
     }
     if (!panelPasswordSet()) {
-        writeAdminErr(res, 400, 'Chưa thiết lập mật khẩu bảng điều khiển, vui lòng hoàn thành thiết lập lần đầu trước');
+        writeAdminErr(res, 400, 'Chưa cài mật khẩu bảng điều khiển, vui lòng hoàn thành cài đặt lần đầu trước');
         return;
     }
     if (hashPassword(toStr(body?.password)) !== authHash) {
-        writeAdminErr(res, 401, 'Sai mật khẩu');
+        writeAdminErr(res, 401, 'Mật khẩu không đúng');
         return;
     }
     const token = newSessionToken();
@@ -192,7 +192,7 @@ async function handleAuthLogin(req, res) {
     writeJSON(res, 200, { success: true });
 }
 
-// POST /admin/auth/setup {password} -> Thiết lập/Sửa đổi/Tắt mật khẩu bảng điều khiển (password rỗng = Tắt)
+// POST /admin/auth/setup {password} -> Cài đặt/Sửa/Tắt mật khẩu bảng điều khiển (password rỗng = tắt)
 async function handleAuthSetup(req, res) {
     let body;
     try {
@@ -205,7 +205,7 @@ async function handleAuthSetup(req, res) {
     const set = panelPasswordSet();
 
     if (set && !panelOK(req)) {
-        writeAdminErr(res, 401, 'Vui lòng đăng nhập trước rồi mới sửa đổi mật khẩu bảng điều khiển');
+        writeAdminErr(res, 401, 'Vui lòng đăng nhập trước khi sửa mật khẩu bảng điều khiển');
         return;
     }
     if (password === '') {
@@ -236,7 +236,7 @@ async function handleAuthSetup(req, res) {
     }
     authHash = hash;
     if (!set) {
-        // Thiết lập lần đầu thành công coi như đã đăng nhập (Không cần nhập lại lần nữa)
+        // Lần đầu cài đặt thành công thì xem như đã đăng nhập (Không cần nhập lại lần nữa)
         const token = newSessionToken();
         sessions.set(token, Date.now() + PANEL_TTL_MS);
         setPanelCookie(res, token);
@@ -274,7 +274,7 @@ async function handleAdminSettings(req, res) {
         return;
     }
     if (req.method !== 'POST') {
-        writeAdminErr(res, 405, 'Method không được hỗ trợ');
+        writeAdminErr(res, 405, 'Phương thức không được hỗ trợ');
         return;
     }
     let body;
@@ -289,16 +289,16 @@ async function handleAdminSettings(req, res) {
 
     const [changed, notes] = applySettings(body);
     for (const k of changed) {
-        if (k === 'nai_key' && settingsGet.naiKey() !== '') console.log('[V.Adapter] [Settings] nai_key đã được cập nhật (Client phải đồng bộ đổi Key)');
-        if (k === 'qwen_key') console.log('[V.Adapter] [Settings] qwen_key đã được cập nhật');
+        if (k === 'nai_key' && settingsGet.naiKey() !== '') console.log('[V.Adapter] [Settings] nai_key đã cập nhật (Client phải đồng bộ đổi Key)');
+        if (k === 'qwen_key') console.log('[V.Adapter] [Settings] qwen_key đã cập nhật');
     }
     writeJSON(res, 200, { success: true, changed, notes, settings: settingsView() });
 }
 
-// POST /admin/test -> Gọi thực tế API sinh ảnh tuyến trên 1 lần (body có thể ghi đè url/key/model/size/prompt, không lưu vào ổ đĩa)
+// POST /admin/test -> Gọi thực tế API tạo ảnh tuyến trên một lần (body có thể ghi đè url/key/model/size/prompt, không lưu ra đĩa)
 async function handleAdminTest(req, res) {
     if (req.method !== 'POST') {
-        writeAdminErr(res, 405, 'Method không được hỗ trợ');
+        writeAdminErr(res, 405, 'Phương thức không được hỗ trợ');
         return;
     }
     let body;
@@ -356,7 +356,7 @@ async function handleAdminTest(req, res) {
         ext: img.ext,
         bytes,
         preview: previewOf(img),
-        message: `Sinh ảnh thành công: Thời gian ${latency}ms, luồng ${img.via}`,
+        message: `Tạo ảnh thành công: Thời gian phản hồi ${latency}ms, luồng ${img.via}`,
     });
 }
 
@@ -380,13 +380,13 @@ function handleAdminLogs(req, res, url) {
         writeJSON(res, 200, { success: true });
         return;
     }
-    writeAdminErr(res, 405, 'Method không được hỗ trợ');
+    writeAdminErr(res, 405, 'Phương thức không được hỗ trợ');
 }
 
-// POST /admin/translate -> Biên dịch nhân vật (Tùy chọn kèm theo xuất ảnh)
+// POST /admin/translate -> Dịch nhân vật (Có thể tùy chọn xuất ảnh kèm theo)
 async function handleAdminTranslate(req, res) {
     if (req.method !== 'POST') {
-        writeAdminErr(res, 405, 'Method không được hỗ trợ');
+        writeAdminErr(res, 405, 'Phương thức không được hỗ trợ');
         return;
     }
     let body;
@@ -397,7 +397,7 @@ async function handleAdminTranslate(req, res) {
         return;
     }
     if (!body || typeof body !== 'object') {
-        writeAdminErr(res, 400, 'Phân tích request body thất bại');
+        writeAdminErr(res, 400, 'Parse body request thất bại');
         return;
     }
 
@@ -407,7 +407,7 @@ async function handleAdminTranslate(req, res) {
     let result;
     const givenPrompt = toStr(body.prompt).trim();
     if (givenPrompt) {
-        // "Vẽ thêm tấm nữa": Tiếp tục dùng prompt của lần trước, không đi qua biên dịch nữa
+        // "Tạo thêm một tấm": Tiếp tục dùng prompt của lần trước, không qua bước dịch nữa
         let neg = toStr(body.negative).trim();
         if (!neg) neg = mergeNegative(translateDefaultNegative);
         const [dw, dh] = defaultSizeWH();
@@ -419,11 +419,11 @@ async function handleAdminTranslate(req, res) {
         try {
             result = await translateCharacter(targetFromSettings(), toStr(body.text));
         } catch (e) {
-            console.log(`[V.Adapter] [Translate] Biên dịch thất bại: ${e.message}`);
+            console.log(`[V.Adapter] [Translate] Dịch thất bại: ${e.message}`);
             writeAdminErr(res, 502, truncate(e.message, 300));
             return;
         }
-        console.log(`[V.Adapter] [Translate] Biên dịch thành công: ${truncate(toStr(body.text).trim(), 40)} -> Tổng prompt ${[...result.prompt].length} chữ`);
+        console.log(`[V.Adapter] [Translate] Dịch thành công: ${truncate(toStr(body.text).trim(), 40)} -> Tổng prompt ${[...result.prompt].length} chữ`);
     }
 
     const out = { success: true, data: result };
@@ -463,7 +463,7 @@ async function handleAdminTranslate(req, res) {
         rec.error = truncate(gerr.message, 300);
         genLog.Add(rec);
         console.log(`[V.Adapter] [Translate] Xuất ảnh thất bại (${latency}ms): ${gerr.message}`);
-        // Biên dịch thành công nhưng xuất ảnh thất bại: Vẫn là 200, lỗi để ở image_error (Tránh xóa mất prompt đã lấy được)
+        // Dịch thành công nhưng xuất ảnh thất bại: Vẫn trả về 200, lỗi đặt trong image_error (Tránh xóa mất prompt đã lấy được)
         out.image_error = truncate(gerr.message, 500);
         writeJSON(res, 200, out);
         return;
@@ -483,9 +483,9 @@ async function handleAdminTranslate(req, res) {
     writeJSON(res, 200, out);
 }
 
-// -- Công cụ tiện ích --
+// -- Tiện ích con --
 
-// previewOf Bảng điều khiển xem trước (preview): Có byte thì dùng data URL; Chỉ có link từ xa (giáng cấp (fallback) do cross-domain) thì đưa thẳng link.
+// previewOf Preview trên bảng điều khiển: Nếu có byte thì dùng data URL; Nếu chỉ có link từ xa (giáng cấp cross-origin) thì trả thẳng link đó.
 function previewOf(img) {
     if (img.data && img.data.length) {
         return `data:${mimeForExt(img.ext)};base64,${bytesToBase64(img.data)}`;
@@ -493,7 +493,7 @@ function previewOf(img) {
     return img.remoteUrl ?? '';
 }
 
-// defaultSizeWH Phân tích kích thước mặc định, dự phòng (fallback) là 1024x1024 (Tương ứng defaultSizeWH bản Go).
+// defaultSizeWH Parse kích thước mặc định, dự phòng 1024x1024 (Tương ứng với defaultSizeWH của bản Go).
 function defaultSizeWH() {
     const s = normalizeSizeStr(settingsGet.defaultSize()) ?? '1024x1024';
     const [w, h] = s.split('x').map(v => parseInt(v, 10));
@@ -506,7 +506,7 @@ function formatTime(d) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-// -- Lối vào tổng --
+// -- Cổng vào tổng --
 
 /**
  * handleAdminRequest Xử lý request /admin/*.
@@ -522,12 +522,12 @@ export async function handleAdminRequest(req, res, url) {
     if (p === '/admin/status') return handleAdminStatus(req, res), true;
     if (p === '/admin/auth/status') return handleAuthStatus(req, res), true;
 
-    // Liên quan đến đăng nhập (Tự phán đoán trạng thái đăng nhập)
+    // Liên quan đến đăng nhập (Tự đánh giá trạng thái đăng nhập)
     if (p === '/admin/auth/login') { await handleAuthLogin(req, res); return true; }
     if (p === '/admin/auth/setup') { await handleAuthSetup(req, res); return true; }
     if (p === '/admin/auth/logout') return handleAuthLogout(req, res), true;
 
-    // Các phần còn lại yêu cầu đăng nhập bảng điều khiển (Khi chưa đặt mật khẩu thì cho qua)
+    // Các endpoint còn lại yêu cầu đăng nhập bảng điều khiển (Bỏ qua nếu chưa cài mật khẩu)
     const routes = {
         '/admin/settings': handleAdminSettings,
         '/admin/test': handleAdminTest,

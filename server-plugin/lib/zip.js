@@ -1,9 +1,9 @@
-// zip.js — Đóng gói byte hình ảnh thành file ZIP mà client NovelAI mong đợi (bên trong chứa một bức ảnh).
-// Tương ứng với writeImageZip của nai_handler.go bản Go (Bản Go dùng archive/zip).
-// Ở đây viết tay ZIP "kiểu lưu trữ (store, không nén)": Bản thân hình ảnh đã được nén rồi, thực hiện deflate thêm cũng không có ý nghĩa gì nhiều,
-// hơn nữa lại không có dependency (zero-dependency), có thể kiểm soát byte, logic giải nén của client (SillyTavern/Helper, v.v...) đối xử bình đẳng với cả store và deflate.
+// zip.js - Đóng gói byte của ảnh thành file ZIP theo kỳ vọng của client NovelAI (bên trong chứa một bức ảnh).
+// Tương ứng với writeImageZip của nai_handler.go bản Go (Go sử dụng archive/zip).
+// Ở đây tự viết tay file ZIP dạng "lưu trữ (store, không nén)": Bản thân ảnh đã được nén, làm thêm deflate không mang nhiều ý nghĩa,
+// đồng thời zero-dependency, byte có thể kiểm soát, logic giải nén của client (SillyTavern/trợ lý, v.v.) xử lý store và deflate hoàn toàn như nhau.
 
-// Bảng tra cứu (Lookup table) CRC32
+// Bảng tra cứu CRC32
 const CRC_TABLE = (() => {
     const table = new Uint32Array(256);
     for (let i = 0; i < 256; i++) {
@@ -32,10 +32,10 @@ function dosDateTime(d) {
 }
 
 /**
- * Tạo file ZIP chỉ chứa một file duy nhất.
+ * Tạo file ZIP chỉ chứa một file.
  * @param {string} fileName Tên file bên trong ZIP (ví dụ: image_0.png)
  * @param {Uint8Array} data Byte của file
- * @returns {Buffer} Byte của file ZIP
+ * @returns {Buffer} Byte của ZIP
  */
 export function createZip(fileName, data) {
     const nameBuf = Buffer.from(fileName, 'utf8');

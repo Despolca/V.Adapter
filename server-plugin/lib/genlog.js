@@ -1,5 +1,5 @@
-// genlog.js — Circular buffer cho lịch sử sinh ảnh (trên memory, 200 mục gần nhất), dành cho tổng quan hoạt động của bảng điều khiển và trang hiển thị lịch sử.
-// Port 1:1 từ V.Adapter (Go) genlog.go.
+// genlog.js - Circular buffer cho lịch sử tạo (trong memory, 200 mục gần nhất), phục vụ cho tổng quan hoạt động của bảng điều khiển và hiển thị ở trang lịch sử.
+// Port 1:1 từ genlog.go của V.Adapter (Go).
 
 const GEN_LOG_CAP = 200;
 
@@ -21,7 +21,7 @@ class GenLogStore {
         }
     }
 
-    // limit mục đầu tiên, mới nhất xếp trước.
+    // Lấy limit mục đầu tiên, mới nhất xếp trước.
     Snapshot(limit) {
         const n = this.records.length;
         if (!limit || limit <= 0 || limit > n) limit = n;
@@ -42,7 +42,7 @@ class GenLogStore {
 export const genLog = new GenLogStore();
 export const genLogCap = GEN_LOG_CAP;
 
-// Constructor của GenRecord (Các trường nhất quán với JSON tag của GenRecord bản Go, bảng điều khiển tiêu thụ trực tiếp).
+// Constructor của GenRecord (các trường giống hệt JSON tag của GenRecord bản Go, bảng điều khiển tiêu thụ trực tiếp).
 export function newRecord(fields) {
     return Object.assign({
         time: '', kind: '', endpoint: '', model: '', prompt: '',

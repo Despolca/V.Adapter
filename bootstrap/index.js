@@ -1,13 +1,13 @@
-// index.js — Bootloader server của V.Adapter (vị trí triển khai <SillyTavern>/plugins/V.Adapter/).
+// index.js - Loader service của V.Adapter (Vị trí deploy <SillyTavern>/plugins/V.Adapter/).
 //
-// SillyTavern có hai giới hạn nền tảng: plugin server chỉ được load một lần khi tiến trình (process) khởi động, và không cung cấp bất kỳ cổng vào (entry) cài đặt nào.
-// Tác dụng của file này là cách ly hai giới hạn đó ra - bản thân nó không chứa logic nghiệp vụ, cũng không thay đổi theo phiên bản,
-// chỉ load bản triển khai (implementation) thực sự bên dưới extensions/<thư mục extension>/server-plugin/ theo nhu cầu trong tiến trình của SillyTavern.
+// SillyTavern có hai giới hạn nền tảng: plugin server chỉ được load một lần khi khởi động tiến trình, và không cung cấp bất kỳ cổng cài đặt nào.
+// Tác dụng của file này là cách ly hai giới hạn đó - bản thân nó không chứa business logic, cũng không thay đổi theo phiên bản,
+// mà chỉ load các implementation thực tế nằm trong extensions/<thư mục extension>/server-plugin/ theo nhu cầu bên trong tiến trình của SillyTavern.
 //
-// Hiệu quả đạt được từ việc này:
-//   - Bản triển khai server được phân phối cùng với extension, sau khi pull thông qua "Install Extension" thì không cần copy lại code plugin nữa;
-//   - Sau khi cập nhật bản triển khai, chỉ cần reload là có hiệu lực, không cần khởi động lại tiến trình SillyTavern;
-//   - Dữ liệu hoạt động được giữ lại ở plugins/V.Adapter/data/, tách biệt (decouple) với vị trí chứa code.
+// Hiệu quả đạt được:
+//   - Implementation của server được phân phối cùng với extension, sau khi pull về qua "Install Extension" thì không cần copy code của plugin nữa;
+//   - Sau khi implementation cập nhật, chỉ cần reload là có tác dụng, không cần khởi động lại tiến trình SillyTavern;
+//   - Dữ liệu chạy được giữ lại trong plugins/V.Adapter/data/, tách biệt (decoupled) với vị trí chứa code.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const info = {
     id: 'v-adapter',
     name: 'V.Adapter',
-    description: 'Bootloader dịch vụ tương thích giao thức NovelAI: Load bản triển khai server bên trong extension V.Adapter theo nhu cầu.',
+    description: 'Loader service tương thích giao thức NovelAI: Load implementation của server nằm trong extension V.Adapter theo nhu cầu.',
 };
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -25,7 +25,7 @@ const DATA_DIR = path.join(here, 'data');
 let impl = null;
 let busy = false;
 
-// safeReaddir Đọc các mục trong thư mục; trả về mảng rỗng khi không thể đọc.
+// safeReaddir đọc các mục trong thư mục; khi không thể đọc thì trả về mảng rỗng.
 function safeReaddir(dir) {
     try {
         return fs.readdirSync(dir, { withFileTypes: true });
@@ -34,8 +34,8 @@ function safeReaddir(dir) {
     }
 }
 
-// candidateRoots Liệt kê các thư mục có thể chứa extension.
-// Khi context request khả dụng thì ưu tiên dùng nó; trong giai đoạn auto-start không có request, lùi về (fallback) data/<user>/extensions dưới thư mục làm việc của tiến trình.
+// candidateRoots liệt kê các thư mục có thể chứa extension.
+// Ưu tiên sử dụng request context nếu có sẵn; trong giai đoạn tự động khởi động (auto-start) không có request, sẽ lùi về data/<user>/extensions dưới thư mục làm việc của tiến trình.
 function candidateRoots(req) {
     const roots = [];
     const fromRequest = String(req?.user?.directories?.extensions ?? '');
@@ -53,8 +53,8 @@ function candidateRoots(req) {
     return roots;
 }
 
-// findImplFile Tìm kiếm server-plugin/index.js.
-// Tên thư mục extension lấy từ tên repo, ở đây quét từng lớp để tương thích với các cách đặt tên khác nhau.
+// findImplFile tìm kiếm server-plugin/index.js.
+// Tên thư mục extension lấy từ tên repository, ở đây quét từng lớp để tương thích với các cách đặt tên khác nhau.
 function findImplFile(req) {
     for (const root of candidateRoots(req)) {
         if (!root || !fs.existsSync(root)) continue;
@@ -67,14 +67,14 @@ function findImplFile(req) {
     return '';
 }
 
-// loadImpl Load động (dynamic load) bản triển khai server.
-// Đính kèm timestamp vào URL để vượt qua (bypass) cache module ESM, giúp code sau khi cập nhật có thể sử dụng ngay trong cùng một lần chạy.
+// loadImpl load động implementation của server.
+// Thêm timestamp vào URL để bypass cache module ESM, giúp code sau khi cập nhật có thể sử dụng ngay trong cùng một lần chạy.
 async function loadImpl(file) {
     process.env.VADAPTER_DATA_DIR = DATA_DIR;
     return await import(pathToFileURL(file).href + '?v=' + Date.now());
 }
 
-// statusOf Đọc trạng thái hoạt động do bản triển khai báo cáo; xử lý như trạng thái đã dừng khi bản triển khai chưa được load.
+// statusOf đọc trạng thái hoạt động do implementation báo cáo; nếu implementation chưa được load thì xử lý như trạng thái đã dừng.
 function statusOf(req) {
     const file = findImplFile(req);
     const base = {
@@ -156,7 +156,7 @@ export async function init(router) {
         }
     });
 
-    // reload Dùng để load bản triển khai sau khi cập nhật: giải phóng port và tài nguyên trước, sau đó đọc code mới trên cùng đường dẫn.
+    // reload dùng để load implementation đã cập nhật: giải phóng port và tài nguyên trước, sau đó đọc code mới trên cùng một đường dẫn.
     router.post('/reload', async (req, res) => {
         if (busy) return res.status(409).json({ ok: false, error: 'Thao tác trước đó vẫn chưa kết thúc' });
         busy = true;
@@ -175,17 +175,17 @@ export async function init(router) {
     await autoStart();
 }
 
-// autoStart Cố gắng gọi (pull up) dịch vụ giao thức khi SillyTavern khởi động, giúp hành vi của server nhất quán với các plugin thông thường:
-// Sau khi khởi động lại, có thể cung cấp port :8888 ra bên ngoài mà không cần can thiệp thủ công.
-// Thất bại cũng không cản trở SillyTavern khởi động, lúc này ngăn extension (drawer) sẽ hiển thị dịch vụ không khả dụng, để người dùng tự xử lý.
-// Thiết lập VADAPTER_AUTOSTART=0 có thể tắt hành vi này, chuyển sang khởi động/dừng hoàn toàn thủ công.
+// autoStart cố gắng khởi chạy service giao thức khi SillyTavern khởi động, giúp hành vi của server đồng nhất với các plugin thông thường:
+// Sau khi khởi động lại, không cần can thiệp thủ công vẫn có thể cung cấp port :8888 ra bên ngoài.
+// Nếu thất bại cũng không chặn việc khởi động của SillyTavern, lúc này ngăn kéo sẽ hiển thị service không khả dụng, do người dùng tự xử lý.
+// Đặt VADAPTER_AUTOSTART=0 có thể tắt hành vi này, chuyển sang bật/tắt hoàn toàn thủ công.
 async function autoStart() {
     if (String(process.env.VADAPTER_AUTOSTART ?? '1') === '0') return;
     try {
         await startImpl({});
-        console.info('[V.Adapter] Dịch vụ giao thức đã khởi động cùng SillyTavern');
+        console.info('[V.Adapter] Service giao thức đã khởi động cùng SillyTavern');
     } catch (err) {
-        console.warn(`[V.Adapter] Dịch vụ giao thức không khởi động cùng SillyTavern: ${err?.message ?? err}`);
+        console.warn(`[V.Adapter] Service giao thức không khởi động cùng SillyTavern: ${err?.message ?? err}`);
     }
 }
 

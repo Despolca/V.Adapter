@@ -1,104 +1,104 @@
-# V.Adapter · Phiên bản Plugin Server cho SillyTavern
+# V.Adapter · Phiên bản Plugin Server SillyTavern
 
-Dịch vụ adapter dịch giao thức NovelAI thành interface tương thích OpenAI của tuyến trên, được host bởi SillyTavern:
-Plugin khởi động cùng SillyTavern và dừng khi SillyTavern đóng, không cần chạy exe riêng.
+Service chuyển đổi giao thức NovelAI thành API tương thích OpenAI tuyến trên, được host bởi SillyTavern:
+Plugin sẽ khởi động cùng lúc với SillyTavern và dừng lại khi SillyTavern đóng, không cần chạy file exe độc lập.
 
 ```
-Plugin minh họa V.Canvas trong SillyTavern ──Giao thức NovelAI──▶ Plugin này (Trong tiến trình SillyTavern, lắng nghe độc lập :8888)
-                                              └──Tương thích OpenAI──▶ API sinh ảnh tuyến trên
+Plugin minh họa V.Canvas trong SillyTavern ──Giao thức NovelAI──▶ Plugin này (Nội bộ tiến trình SillyTavern, listen độc lập ở port :8888)
+                                                              └──Tương thích OpenAI──▶ API tạo ảnh tuyến trên
 ```
 
-> Bề mặt giao thức hướng ra ngoài được giữ nguyên như bản gốc Go: URL kênh NovelAI của client vẫn điền `http://<IP>:8888`.
-> Plugin sử dụng port độc lập thay vì gắn vào route của SillyTavern, nguyên nhân là do phía server SillyTavern có bảo vệ CSRF,
-> Client bên thứ ba kết nối trực tiếp đến route plugin của SillyTavern sẽ bị chặn 403, port độc lập có thể lách giới hạn này.
+> Giao diện giao thức hướng ra bên ngoài được giữ nguyên như bản gốc Go: URL channel NovelAI của client vẫn điền `http://<IP>:8888`.
+> Lý do plugin sử dụng port độc lập thay vì mount vào router của SillyTavern là vì server SillyTavern có bảo vệ CSRF,
+> client bên thứ ba kết nối trực tiếp vào router plugin của SillyTavern sẽ bị 403 chặn lại, port độc lập có thể lách qua giới hạn này.
 
 ---
 
 ## I. Cài đặt và Khởi động
 
-Thư mục này không được dùng trực tiếp làm plugin của SillyTavern, mà được load theo nhu cầu bởi bootloader nằm trong `<SillyTavern>/plugins/V.Adapter/`
-(xem `bootstrap/index.js` ở thư mục gốc của repository). Phân công như sau:
+Thư mục này không được sử dụng trực tiếp như một plugin SillyTavern, mà sẽ được loader nằm ở `<SillyTavern>/plugins/V.Adapter/`
+load theo nhu cầu (xem `bootstrap/index.js` ở thư mục gốc của repository). Phân công như sau:
 
 | Vị trí | Nội dung |
 |---|---|
-| `<SillyTavern>/plugins/V.Adapter/` | Bản thân bootloader (copy từ `bootstrap/` qua), triển khai 1 lần sau đó không thay đổi nữa |
-| `server-plugin/` bên trong thư mục extension | Bản triển khai phía server, được phân phối và cập nhật cùng với extension |
-| `data/` bên dưới thư mục bootloader | Cấu hình chạy và credential (thông tin xác thực), độc lập với vị trí chứa code |
+| `<SillyTavern>/plugins/V.Adapter/` | Bản thể của loader (Copy từ `bootstrap/`), sau một lần deploy sẽ không thay đổi nữa |
+| `server-plugin/` bên trong thư mục extension | Implementation của server, được phân phối và cập nhật cùng với extension |
+| `data/` nằm dưới thư mục loader | Cấu hình chạy và thông tin xác thực, tách biệt với vị trí chứa code |
 
 Các bước:
 
 1) Chạy `install-loader.bat` (Windows) hoặc `install-loader.sh` (Linux / macOS / Termux) ở thư mục gốc của repository
 2) Trong `<SillyTavern>/config.yaml`:
        enableServerPlugins: true
-       enableServerPluginsAutoUpdate: false      # Tùy chọn, bỏ qua thao tác kiểm tra git cho thư mục plugin lúc khởi động
+       enableServerPluginsAutoUpdate: false      # Tùy chọn, bỏ qua bước check git cho thư mục plugin khi khởi động
 3) Khởi động lại SillyTavern
-4) Mở ngăn extension (drawer) của V.Adapter, bấm "Khởi động dịch vụ giao thức"
+4) Mở ngăn kéo extension V.Adapter, bấm "Khởi động service giao thức"
 
-Từ đó về sau cập nhật bản triển khai phía server không cần khởi động lại SillyTavern: Sau khi cập nhật extension, chỉ cần bấm "Tải lại bản triển khai" trong ngăn extension là được.
+Từ nay về sau, việc cập nhật implementation server không cần khởi động lại SillyTavern: Cập nhật extension xong, bấm "Reload implementation" trong ngăn kéo là được.
 
 Sau khi khởi động thành công:
 
 | Địa chỉ | Mục đích sử dụng |
 |---|---|
-| `http://127.0.0.1:8888/` | **Bảng quản lý** (Tổng quan hoạt động / Biên dịch nhân vật / Lịch sử sinh ảnh / Trung tâm cài đặt) |
-| `http://127.0.0.1:8888/ai/generate-image` | Endpoint sinh ảnh, trả về ZIP |
-| `http://127.0.0.1:8000/api/plugins/v-adapter/status` | Trạng thái read-only phía SillyTavern (Mở được tức là bootloader đã được SillyTavern load) |
+| `http://127.0.0.1:8888/` | **Bảng quản lý** (Tổng quan hoạt động / Dịch nhân vật / Lịch sử tạo / Trung tâm cài đặt) |
+| `http://127.0.0.1:8888/ai/generate-image` | Endpoint tạo ảnh, trả về ZIP |
+| `http://127.0.0.1:8000/api/plugins/v-adapter/status` | Trạng thái read-only phía SillyTavern (Mở được tức là loader đã được SillyTavern load) |
 
-> ⚠️ **Port 8888 tại cùng một thời điểm chỉ cho phép một tiến trình chiếm dụng.** Nếu file exe của bản Go cũ vẫn đang chạy, cần đóng lại trước,
-> nếu không plugin khi khởi động sẽ báo lỗi `Port 8888 đã bị chiếm dụng` (Log nằm ở console của SillyTavern, tiền tố `[V.Adapter]`).
+> ⚠️ **Tại cùng một thời điểm, port 8888 chỉ cho phép một tiến trình chiếm dụng.** Nếu file exe bản Go cũ vẫn đang chạy, cần phải tắt đi trước,
+> nếu không khi plugin khởi động sẽ báo lỗi `Port 8888 đã bị chiếm dụng` (Log nằm ở console của SillyTavern, tiền tố `[V.Adapter]`).
 
 ---
 
-## II. Hai hình thái response: ZIP (Giao thức) và Xuất thẳng ảnh
+## II. Hai hình thái phản hồi: ZIP (Giao thức) và Ảnh trực tiếp
 
-`POST /ai/generate-image` **Mặc định trả về ZIP** - Đây là định dạng response của giao thức NovelAI,
-SillyTavern helper cũng như bất kỳ client NAI tiêu chuẩn nào đều phụ thuộc vào định dạng này.
+`POST /ai/generate-image` **mặc định trả về ZIP** - Đây là định dạng phản hồi của giao thức NovelAI,
+trợ lý SillyTavern cũng như mọi client NAI tiêu chuẩn đều phụ thuộc vào định dạng này.
 
-Tuy nhiên client của dịch vụ này không cần đi qua lớp đóng gói (encapsulation) đó. Khi client khai báo "Chỉ cần hình ảnh", server sẽ trực tiếp trả về
-byte stream (luồng byte) PNG/JPEG, **không đóng gói ZIP**:
+Nhưng client của service này không cần đi qua lớp đóng gói đó. Khi client tuyên bố "Chỉ cần ảnh", server sẽ trả về trực tiếp
+luồng byte PNG/JPEG, **không đóng gói ZIP**:
 
-| Hành vi của Client | Trả về của Server |
+| Hành vi client | Server trả về |
 |---|---|
-| `Accept: image/*` (và không chủ động yêu cầu zip) | **`Content-Type: image/png` Trực tiếp là byte ảnh** |
-| Chuỗi truy vấn (query string) có mang `?raw=1` | Như trên (Bắt buộc xuất thẳng) |
-| Không gửi `Accept` (Tương đương `*/*`), hoặc khai báo rõ `application/zip` | `application/zip` (Định dạng giao thức) |
+| `Accept: image/*` (Và không chủ động yêu cầu zip) | **`Content-Type: image/png` trực tiếp là byte của ảnh** |
+| Query string có chứa `?raw=1` | Như trên (Bắt buộc trả ảnh trực tiếp) |
+| Không gửi `Accept` (Tương đương `*/*`), hoặc yêu cầu rõ `application/zip` | `application/zip` (Định dạng giao thức) |
 
-Cả hai hình thái đều trả về cùng một bức ảnh, điểm khác biệt duy nhất là vỏ ngoài có đóng gói ZIP hay không. Plugin minh họa V.Canvas đi theo đường dẫn xuất thẳng,
-do đó không cần giải nén (unpack).
+Cả hai hình thái đều trả về cùng một bức ảnh, sự khác biệt chỉ nằm ở lớp vỏ ngoài có đóng gói ZIP hay không. Plugin minh họa V.Canvas sử dụng luồng ảnh trực tiếp,
+do đó không cần giải nén.
 
-### Tham số mở rộng `?expand=1` (Mở rộng input)
+### Tham số mở rộng `?expand=1` (Mở rộng đầu vào)
 
-Khi thêm chuỗi truy vấn `expand=1` vào `POST /ai/generate-image`, server sẽ đưa `input` trong request
-cho model chat đã cấu hình trước, mở rộng thành prompt toàn cảnh bằng ngôn ngữ tự nhiên hoàn chỉnh, rồi mới dùng kết quả mở rộng để xuất ảnh.
+Khi thêm query string `expand=1` vào `POST /ai/generate-image`, server sẽ ưu tiên giao `input` trong request
+cho model chat đã cấu hình, mở rộng thành một prompt hình ảnh ngôn ngữ tự nhiên hoàn chỉnh, rồi mới dùng kết quả mở rộng đó để xuất ảnh.
 
-Mục đích sử dụng: Dành cho trang "Biên dịch xuất ảnh" của V.Canvas và các cổng vào **phát lệnh sinh ảnh từ một mô tả ngắn gọn** sử dụng -
-Bên gọi (caller) không cần tự nắm giữ credential của model chat, cũng không cần trực tiếp gửi request đến `/admin/*` (Đường dẫn này yêu cầu mật khẩu bảng điều khiển).
+Mục đích sử dụng: Dành cho trang "Dịch xuất ảnh" của V.Canvas và các cổng vào **kích hoạt tạo ảnh từ một câu mô tả ngắn** -
+Bên gọi API không cần tự giữ thông tin xác thực model chat, cũng không cần gửi request trực tiếp vào `/admin/*` (Đường dẫn này cần mật khẩu bảng điều khiển).
 
-| Mục | Hành vi |
+| Hạng mục | Hành vi |
 |---|---|
-| Output | `input` -> `lib/translate.js` (Biên dịch nhân vật, cùng một luồng với bảng điều khiển) -> Prompt sau khi mở rộng |
-| Từ khóa phủ định | Từ khóa phủ định trả về từ việc mở rộng sẽ được gộp chung với từ khóa phủ định có sẵn trong request |
-| Kích thước | Khi request không ghi rõ chiều rộng/cao (thiếu hoặc < 16), sẽ áp dụng kích thước đề xuất từ việc mở rộng; Khi có ghi rõ thì lấy theo request làm chuẩn |
-| Lùi về dự phòng (Fallback) | Request mở rộng thất bại / timeout / trả về rỗng / độ dài bất thường (Gấp 5 lần input gốc và lớn hơn 400 ký tự) -> **Lùi về gửi đi `input` nguyên trạng, không cản trở việc xuất ảnh** |
-| Khả năng quan sát (Observability) | Mỗi lần mở rộng sẽ để lại một mục `expand` trong lịch sử sinh ảnh (Thành công hay thất bại đều ghi lại); Khi lùi về, response header `X-Illust-Expand` sẽ mang giá trị `fallback` |
-| Response header | `X-Illust-Via` (Luồng thực tế), `X-Illust-Prompt` (Prompt thực tế gửi lên tuyến trên, mã hóa URL), `X-Illust-Expand` (`ok` / `fallback`) |
+| Đầu ra | `input` -> `lib/translate.js` (Dịch nhân vật, cùng một luồng với bảng điều khiển) -> Prompt sau khi mở rộng |
+| Từ tiêu cực | Từ tiêu cực trả về từ việc mở rộng được gộp chung với từ tiêu cực mang theo trong request |
+| Kích thước | Nếu request không cung cấp rõ chiều rộng/chiều cao (Thiếu hoặc < 16), sẽ dùng kích thước được đề xuất từ bản mở rộng; Nếu có cung cấp rõ thì lấy theo request |
+| Dự phòng thất bại | Request mở rộng thất bại / quá thời gian chờ / trả về rỗng / độ dài bất thường (Vượt quá 5 lần input gốc và lớn hơn 400 ký tự) -> **Lùi về việc gửi nguyên xi `input`, không cản trở quá trình tạo ảnh** |
+| Khả năng quan sát | Mỗi lần mở rộng sẽ để lại một mục `expand` trong lịch sử tạo (Thành công hay thất bại đều ghi lại); Khi lùi về dự phòng, header phản hồi `X-Illust-Expand` sẽ là `fallback` |
+| Header phản hồi | `X-Illust-Via` (Luồng thực tế), `X-Illust-Prompt` (Prompt thực tế gửi lên tuyến trên, đã URL encode), `X-Illust-Expand` (`ok` / `fallback`) |
 
-Client NAI tiêu chuẩn sẽ không mang tham số này, cũng không đọc các response header này, do đó tính tương thích giao thức không bị ảnh hưởng.
+Client NAI tiêu chuẩn sẽ không mang tham số này, cũng không đọc các header phản hồi này, do đó tính tương thích của giao thức không bị ảnh hưởng.
 
 ## III. Cấu hình
 
-Hai tầng, độ ưu tiên từ thấp đến cao:
+Gồm hai lớp, ưu tiên từ thấp đến cao:
 
 | File | Tác dụng |
 |---|---|
-| `data/config.json` | **Giá trị mặc định khởi động** (Điền vào đây khi triển khai lần đầu) |
-| `data/settings.json` | Nơi lưu lại các thay đổi từ bảng điều khiển (Sau khi bảng điều khiển thay đổi thì sẽ lấy theo file này làm chuẩn) |
+| `data/config.json` | **Giá trị mặc định khi khởi động** (Lần đầu deploy thì điền ở đây) |
+| `data/settings.json` | Nơi lưu trữ thay đổi từ bảng điều khiển (Sau khi sửa trên bảng điều khiển thì sẽ ưu tiên file này) |
 
 ```json
 {
   "listen": "0.0.0.0:8888",
   "qwen_url": "http://127.0.0.1:4000/v1",
-  "qwen_key": "Key_tuyến_trên_của_bạn",
+  "qwen_key": "Secret key tuyến trên của bạn",
   "qwen_model": "qwen3.8-max",
   "default_size": "1024x1024",
   "nai_key": "v-adapter-8888",
@@ -106,20 +106,20 @@ Hai tầng, độ ưu tiên từ thấp đến cao:
 }
 ```
 
-Hỗ trợ cả biến môi trường (Độ ưu tiên nằm ở giữa hai loại trên):
+Cũng hỗ trợ biến môi trường (Mức độ ưu tiên nằm giữa hai loại trên):
 `VADAPTER_QWEN_URL` / `OPENAI_BASE_URL`, `VADAPTER_QWEN_KEY` / `OPENAI_API_KEY`,
 `VADAPTER_QWEN_MODEL` / `OPENAI_IMAGE_MODEL`, `VADAPTER_LISTEN`, `VADAPTER_DEFAULT_SIZE`, `VADAPTER_NAI_KEY`.
 
 **Khôi phục lại cấu hình của `config.json`**: Xóa file `data/settings.json` và khởi động lại SillyTavern.
 
-### Các mục cấu hình quan trọng
+### Các cấu hình quan trọng
 
-| Trường | Giá trị đề xuất | Giải thích |
+| Trường | Giá trị khuyến nghị | Mô tả |
 |---|---|---|
-| `chat_fallback` | `chat_only` | Chỉ sử dụng interface chat để xuất ảnh. Interface sinh ảnh tiêu chuẩn tuyến trên `/images/generations` trả về 500 một cách ổn định, cố thử dùng interface đó cũng vô ích |
-| `qwen_model` | `qwen3.8-max` | Bắt buộc phải là **Model chat** (Sinh ra hình ảnh trong khung chat và trả về link ảnh). Không hỗ trợ các model có hậu tố `-image` |
-| `nai_key` | `v-adapter-8888` | Trường "API Key" trong plugin minh họa phải giống với chỗ này. Làm trống nghĩa là cho qua mọi key |
-| `listen` | `0.0.0.0:8888` | Cục bộ (Localhost) là 127.0.0.1:8888; `0.0.0.0` dùng để hỗ trợ kết nối từ client điện thoại. Sau khi sửa cần khởi động lại SillyTavern |
+| `chat_fallback` | `chat_only` | Chỉ sử dụng API chat để xuất ảnh. API tạo ảnh tiêu chuẩn `/images/generations` tuyến trên liên tục trả về 500, việc thử API này không có tác dụng |
+| `qwen_model` | `qwen3.8-max` | Bắt buộc phải là **model chat** (Tạo ảnh trong cuộc trò chuyện và trả về link ảnh). Không hỗ trợ các model có hậu tố `-image` |
+| `nai_key` | `v-adapter-8888` | "API Key" trong plugin minh họa phải giống với cấu hình ở đây. Để trống đồng nghĩa với việc cho phép bất kỳ key nào |
+| `listen` | `0.0.0.0:8888` | Localhost là 127.0.0.1:8888; `0.0.0.0` dùng để hỗ trợ kết nối từ client điện thoại. Sửa xong cần khởi động lại SillyTavern |
 
 ### Client (Plugin V.Canvas) điền gì
 
@@ -127,90 +127,90 @@ Hỗ trợ cả biến môi trường (Độ ưu tiên nằm ở giữa hai lo�
 |---|---|
 | Địa chỉ dịch vụ NAI | `http://127.0.0.1:8888` |
 | API Key | `v-adapter-8888` |
-| Tên model | Để trống (Dịch vụ này sẽ bỏ qua tên model do client gửi đến) |
+| Tên model | Bỏ trống (Service này sẽ phớt lờ tên model do client gửi tới) |
 
-Giá trị mặc định ban đầu của plugin chính là như trên, thông thường không cần sửa.
-
----
-
-## IV. Đăng nhập bảng quản lý
-
-- **Lần đầu mở ra sẽ miễn mật khẩu**, bảng điều khiển sẽ nhắc nhở thiết lập mật khẩu (cũng có thể bỏ qua, lát sau vào "Trung tâm cài đặt" để bổ sung).
-- Sau khi thiết lập mật khẩu, `/admin/*` sẽ yêu cầu đăng nhập; **Các endpoint sinh ảnh `/ai/*` không bị ảnh hưởng** (Client sử dụng `nai_key`, không liên quan đến việc đăng nhập bảng điều khiển).
-- Mật khẩu được lưu trữ dưới dạng SHA-256 tại `data/auth.json`, session là cookie trên RAM, hết hạn sau 24 giờ.
+Giá trị mặc định ban đầu của plugin chính là như trên, thông thường không cần chỉnh sửa.
 
 ---
 
-## V. Cấu trúc thư mục
+## IV. Đăng nhập Bảng quản lý
+
+- **Mở lần đầu không cần mật khẩu**, bảng điều khiển sẽ gợi ý cài mật khẩu (Có thể bỏ qua, sau đó vào "Trung tâm cài đặt" để bổ sung).
+- Sau khi cài mật khẩu, các đường dẫn `/admin/*` sẽ yêu cầu đăng nhập; **Các endpoint tạo ảnh `/ai/*` không bị ảnh hưởng** (Client sử dụng `nai_key`, không liên quan đến việc đăng nhập bảng điều khiển).
+- Mật khẩu được lưu trữ dưới dạng SHA-256 trong `data/auth.json`, session sử dụng cookie in-memory, hết hạn sau 24 giờ.
+
+---
+
+## V. Cấu trúc file
 
 ```
 V.Adapter/
-├── index.js            Cổng vào plugin: info / init(router) / exit() (Quy ước của server plugin SillyTavern)
-├── package.json        Bắt buộc phải chứa "type": "module" -- plugins/package.json là commonjs,
-│                         khi không ghi đè, index.js sẽ bị Node hiểu là CJS và báo thẳng SyntaxError
+├── index.js            Cổng vào plugin: info / init(router) / exit() (Quy ước server plugin của SillyTavern)
+├── package.json        Bắt buộc phải chứa "type": "module" - plugins/package.json là commonjs,
+│                         nếu không ghi đè thì index.js sẽ bị Node hiểu lầm là CJS khi load, trực tiếp báo SyntaxError
 ├── panel.html          Bảng quản lý (Giao diện nguyên bản)
 ├── lib/
-│   ├── server.js       Dịch vụ HTTP nhúng (Gộp route + CORS + Inject bảng điều khiển)
+│   ├── server.js       Service HTTP nhúng (Lắp ráp router + CORS + Inject bảng điều khiển)
 │   ├── admin.js        Endpoint quản lý + Đăng nhập bảng điều khiển
 │   ├── nai.js          Endpoint giao thức NovelAI (Nhận định dạng NAI, trả về ZIP)
-│   ├── pipeline.js     Gọi API tuyến trên (2 luồng b64/url, fallback chat, ngắt mạch)
-│   ├── translate.js    Biên dịch nhân vật
-│   ├── watermark.js    Xóa watermark (Sử dụng Jimp tích hợp sẵn của SillyTavern)
-│   ├── zip.js          Tự viết tay thuật toán đóng gói ZIP dạng store
+│   ├── pipeline.js     Gọi tuyến trên (Song song b64/url, dự phòng chat, ngắt mạch)
+│   ├── translate.js    Dịch nhân vật
+│   ├── watermark.js    Xóa watermark (Sử dụng Jimp có sẵn của SillyTavern)
+│   ├── zip.js          Tự code chức năng đóng gói ZIP dạng store
 │   ├── settings.js     Đọc/ghi cài đặt (data/config.json + Biến môi trường + data/settings.json)
-│   └── genlog.js       Lịch sử sinh ảnh (Ring buffer trên RAM, 200 mục gần nhất)
-└── data/               Sinh ra lúc runtime (config.json / settings.json / auth.json)
+│   └── genlog.js       Lịch sử tạo (Circular buffer trên bộ nhớ, 200 mục gần nhất)
+└── data/               Tạo ra lúc chạy (config.json / settings.json / auth.json)
 ```
 
 ### Nội dung bổ sung trong đợt này
 
-Hai file từng bị đánh dấu là "đang chờ bổ sung" trong `Ghi chú giải pháp.md` đã được hoàn thành, ngoài ra còn sửa 2 chỗ đứt link của code cũ:
+Hai file được đánh dấu "chờ bổ sung" trong `Phương án thiết kế.md` đã hoàn thành, đồng thời sửa hai liên kết hỏng trong code cũ:
 
 | File | Trạng thái |
 |---|---|
-| `lib/server.js` | Mới viết (Dịch vụ HTTP :8888 nhúng, Preflight CORS, HTML bảng điều khiển inject API bridge), Đã hoàn thành |
-| `lib/admin.js` | Mới viết (Port 1:1 từ admin.go + auth.go + handleAdminSettings), Đã hoàn thành |
-| `package.json` | Thêm mới (`"type": "module"`, nếu không plugin không thể load, xem ở trên) |
-| `lib/pipeline.js` | Fix: Bổ sung `import { settingsGet }` (Trong `targetFromSettings` có gọi nhưng chưa import) |
-| `lib/translate.js` | Fix: `postJSONBridge` -> `postJSON` (Tên hàm gõ nhầm, không khớp với tên lúc import) |
+| `lib/server.js` | Viết mới (Nhúng service HTTP :8888, CORS preflight, Inject API bridge cho HTML của bảng điều khiển), đã hoàn thành |
+| `lib/admin.js` | Viết mới (Port 1:1 từ admin.go + auth.go + handleAdminSettings), đã hoàn thành |
+| `package.json` | Bổ sung (`"type": "module"`, nếu không plugin không thể load được, xem bên trên) |
+| `lib/pipeline.js` | Fix lỗi: Bổ sung `import { settingsGet }` (Được gọi trong `targetFromSettings` nhưng chưa import) |
+| `lib/translate.js` | Fix lỗi: `postJSONBridge` -> `postJSON` (Lỗi gõ sai tên hàm, không khớp với tên lúc import) |
 
-> Bảng điều khiển `panel.html` không bị chỉnh sửa. Nó vốn dĩ đi qua `window.parent.__V_ADAPTER_API__` (Cầu nối của hình thái extension),
-> Dưới hình thái server-side, `server.js` sẽ inject một cầu nối cùng tên vào HTML khi trả về, đổi sang đi qua HTTP thực sự.
+> Bảng điều khiển `panel.html` không có thay đổi. Ban đầu nó chạy qua `window.parent.__V_ADAPTER_API__` (Bridge của hình thái extension),
+> ở hình thái server, `server.js` sẽ inject một bridge cùng tên khi trả về HTML, chuyển sang sử dụng HTTP thực sự.
 
 ---
 
-## VI. Biên bản nghiệm thu (Môi trường SillyTavern 1.18.0)
+## VI. Nhật ký nghiệm thu (Môi trường SillyTavern 1.18.0)
 
-| Hạng mục kiểm tra | Kết quả |
+| Kiểm tra | Kết quả |
 |---|---|
 | Sau khi SillyTavern khởi động, port 8888 có listen không | Có |
 | `GET /health` | 200 `{"status":"ok","version":"v1.1.4-st.1"}` |
-| `GET /ai/user/subscription` (kèm Bearer) | 200 `{"tier":0,"active":true}` |
-| `GET /admin/status` | 200, Cấu hình chính xác |
+| `GET /ai/user/subscription` (Kèm Bearer) | 200 `{"tier":0,"active":true}` |
+| `GET /admin/status` | 200, cấu hình chính xác |
 | `GET /api/plugins/v-adapter/status` (Phía SillyTavern) | 200 -> Plugin đã được SillyTavern load |
-| Bảng điều khiển `GET /` | 200, Đã inject cầu nối API |
+| Bảng điều khiển `GET /` | 200, đã inject API bridge |
 | `GET/POST /admin/settings` | 200 |
-| CORS Preflight `OPTIONS /ai/generate-image` | 204 + `Allow-Origin: *` + `Allow-Headers: Authorization, Content-Type, Accept` |
-| Dùng key sai để gọi sinh ảnh | 401 + Thông báo |
-| **Xuất ảnh End-to-End (Mặt giao thức ZIP)** | 20.2 giây -> 2.73 MB ZIP, bên trong chứa `image_0.png` |
-| **Xuất ảnh End-to-End (Xuất thẳng ảnh)** | 21.8 giây -> `Content-Type: image/png`, file PNG trần 2.57 MB, không đóng gói ZIP |
-| Client cũ `Accept: */*` | Vẫn trả về ZIP, mặt giao thức không bị phá vỡ |
-| Lịch sử sinh ảnh | counters `{success:1, fail:0, total:1}`, `via: chat` |
-| `exit()` (SillyTavern đóng) | Đóng port bình thường |
+| CORS preflight `OPTIONS /ai/generate-image` | 204 + `Allow-Origin: *` + `Allow-Headers: Authorization, Content-Type, Accept` |
+| Cung cấp key sai để gọi API tạo ảnh | 401 + Thông báo lỗi |
+| **Tạo ảnh End-to-end (Giao diện ZIP)** | 20.2 giây -> ZIP 2.73 MB, bên trong chứa `image_0.png` |
+| **Tạo ảnh End-to-end (Ảnh trực tiếp)** | 21.8 giây -> `Content-Type: image/png`, file PNG trần 2.57 MB, không đóng gói ZIP |
+| Client cũ `Accept: */*` | Vẫn trả về ZIP, giao thức không bị phá vỡ |
+| Lịch sử tạo | counters `{success:1, fail:0, total:1}`, `via: chat` |
+| `exit()` (SillyTavern thoát) | Đóng port bình thường |
 
-Ảnh mẫu: `plugins-test-output.png` nằm ở thư mục gốc của repository.
+Ảnh mẫu (Sample): `plugins-test-output.png` ở thư mục gốc của repository.
 
 ### ⚠️ Hai giới hạn đã biết
 
-1. **Kích thước ảnh xuất ra không kiểm soát được.** Luồng chat hoạt động theo kiểu "bảo model vẽ một bức ảnh trong lúc chat", nó sẽ bỏ qua `width`/`height`:
-   Request yêu cầu 832x1216, nhưng thực tế trả về 1664x928. "Độ phân giải" trong plugin về cơ bản vô hiệu đối với luồng này.
-2. **Thi thoảng thất bại là hiện tượng bình thường.** Tuyến trên là bản web được reverse proxy, đôi khi trả về link ảnh không thể download
-   (`502` + "Tất cả link ảnh trả về từ sinh ảnh chat đều không thể download hoặc phân tích"), thông thường thử lại một lần là khôi phục;
-   pipeline cũng sẽ tự động thử lại một lần đối với các lỗi sự cố chốc lát (transient fault).
+1. **Kích thước ảnh xuất ra không thể kiểm soát.** Luồng chat có bản chất là "Yêu cầu model tạo một bức ảnh trong cuộc trò chuyện", nó sẽ bỏ qua `width`/`height`:
+   Request yêu cầu 832x1216, thực tế trả về 1664x928. "Độ phân giải" trong plugin cơ bản là vô hiệu đối với luồng này.
+2. **Thất bại ngẫu nhiên là hiện tượng bình thường.** Tuyến trên là phiên bản web chạy qua reverse proxy, thỉnh thoảng sẽ trả về link ảnh không thể tải xuống
+   (`502` + "Tất cả link ảnh trả về từ tạo ảnh qua chat đều không thể tải xuống hoặc parse"), thử lại một lần thường sẽ tự khôi phục;
+   pipeline cũng sẽ tự động thử lại một lần đối với các lỗi chớp nhoáng (transient error).
 
 ---
 
-## VII. License
+## VII. Giấy phép
 
 MIT License + Điều khoản bổ sung phi thương mại (Xem `LICENSE` ở thư mục gốc), tác giả VILK.
-Cấm thương mại; Khi sáng tác phái sinh/tái phân phối vui lòng giữ lại tên tác giả và tuyên bố license này.
+Cấm thương mại hóa; khi sáng tác phái sinh/phân phối lại vui lòng giữ nguyên chữ ký và tuyên bố cấp phép này.

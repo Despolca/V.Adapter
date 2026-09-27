@@ -1,17 +1,17 @@
-// nai.js — Các endpoint tương thích giao thức NovelAI (Bề mặt gọi (call surface) cho kênh NovelAI của client).
-// Port 1:1 từ V.Adapter (Go) nai_handler.go:
+// nai.js - Endpoint tương thích giao thức NovelAI (Mặt gọi API của channel NovelAI phía client).
+// Port 1:1 từ nai_handler.go của V.Adapter (Go):
 //
-//  POST /ai/generate-image    Sinh ảnh: Request là JSON định dạng NovelAI, response bắt buộc phải là ZIP (Bên trong chứa một bức ảnh)
-//  GET  /ai/user/subscription Test kết nối: Trả về 200 + JSON gói đăng ký (Client hiển thị "Kết nối bình thường: Free")
-//  POST /ai/encode-vibe       Mã hóa vibe: Dịch vụ này không hỗ trợ, trả về 404
+//	POST /ai/generate-image    Tạo ảnh: Request là JSON định dạng NovelAI, phản hồi bắt buộc là ZIP (Bên trong chứa một bức ảnh)
+//	GET  /ai/user/subscription Test kết nối: Trả về 200+JSON đăng ký (Client sẽ hiển thị "Kết nối bình thường:Free")
+//	POST /ai/encode-vibe       Mã hóa vibe: Service này không hỗ trợ, trả về 404
 //
-// Lỗi thống nhất sử dụng non-2xx + {"message": "..."}: Client sẽ lấy trường message để hiển thị cho người dùng,
-// do đó thông báo lỗi bắt buộc phải là văn bản có thể đọc được (readable text), không được chỉ là mã trạng thái (status code) trần trụi.
+// Khi có lỗi bắt buộc phải sử dụng mã khác 2xx + {"message": "..."}: Client sẽ lấy trường message để hiển thị cho người dùng,
+// do đó thông báo lỗi phải là văn bản đọc được, không được chỉ trả về mỗi status code trần.
 //
-// Các tham số mở rộng phi tiêu chuẩn (Tham số truy vấn (query string), không ảnh hưởng đến client NAI tiêu chuẩn):
+// Các tham số mở rộng phi tiêu chuẩn (Query string, không ảnh hưởng đến client NAI tiêu chuẩn):
 //
-//  raw=1     Response xuất thẳng byte của hình ảnh, không bọc vỏ ZIP
-//  expand=1  Đưa input cho model chat để mở rộng thành prompt toàn cảnh hoàn chỉnh rồi mới xuất ảnh (Xem expandInput)
+//	raw=1     Phản hồi xuất trực tiếp byte của ảnh, không bọc vỏ ZIP
+//	expand=1  Ưu tiên giao input cho model chat để mở rộng thành prompt hình ảnh hoàn chỉnh rồi mới xuất ảnh (Xem expandInput)
 
 import crypto from 'node:crypto';
 import { settingsGet, normalizeSizeOrDefault } from './settings.js';
@@ -20,7 +20,7 @@ import { generateImage, truncate, mimeForExt } from './pipeline.js';
 import { translateCharacter } from './translate.js';
 import { createZip } from './zip.js';
 
-// naiKeyGate Xác thực Bearer key do client mang đến (nai_key của server trống = Không xác thực).
+// naiKeyGate Xác minh Bearer key mà client mang tới (nai_key của server rỗng = không xác minh).
 export function naiKeyGate(handler) {
     return async (req, res, ctx) => {
         const want = settingsGet.naiKey();
@@ -32,7 +32,7 @@ export function naiKeyGate(handler) {
             const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
             if (!ok) {
                 return sendJSON(res, 401, {
-                    message: 'API Key không chính xác: Vui lòng điền Key trên kênh NovelAI của client cho khớp với giá trị của server (Có thể xem/sửa tại Bảng quản lý)',
+                    message: 'API Key không chính xác: Vui lòng điền Key ở channel NovelAI phía client giống với giá trị trên server (Có thể xem/sửa trong bảng quản lý)',
                     statusCode: 401,
                 });
             }
@@ -41,7 +41,7 @@ export function naiKeyGate(handler) {
     };
 }
 
-// -- Công cụ tiện ích lấy giá trị từ request body NAI (Tương ứng với các hàm cùng tên trong nai_handler.go của bản Go) --
+// -- Tiện ích lấy giá trị từ body request NAI (Tương ứng với các hàm cùng tên trong nai_handler.go của bản Go) --
 
 function strFromMap(m, key) {
     if (!m) return '';
@@ -65,7 +65,7 @@ function numStr(m, key) {
     return v === null ? '-' : String(Math.round(v));
 }
 
-// v4BaseNegative Một số model đặt từ khóa phủ định tại v4_negative_prompt.caption.base_caption.
+// v4BaseNegative Một số model đặt từ tiêu cực vào v4_negative_prompt.caption.base_caption.
 function v4BaseNegative(params) {
     if (!params) return '';
     const v4 = params.v4_negative_prompt;
@@ -75,7 +75,7 @@ function v4BaseNegative(params) {
     return typeof cap.base_caption === 'string' ? cap.base_caption.trim() : '';
 }
 
-// defaultSizeWH Phân tích kích thước mặc định, dự phòng (fallback) là 1024x1024.
+// defaultSizeWH Parse kích thước mặc định, dự phòng 1024x1024.
 function defaultSizeWH() {
     const s = normalizeSizeOrDefault(settingsGet.defaultSize());
     const [w, h] = s.split('x').map(v => parseInt(v, 10));
@@ -95,26 +95,26 @@ export function sendJSON(res, code, obj) {
     res.end(body);
 }
 
-// promptHeaders Đặt prompt thực tế được gửi lên tuyến trên và trạng thái mở rộng vào response header để truyền về,
-// dành cho các bên gọi (caller) thuộc loại bảng điều khiển hiển thị và đối chiếu. Client NAI tiêu chuẩn sẽ không đọc các header này, không làm ảnh hưởng đến khả năng tương thích giao thức.
-// Giá trị của header bắt buộc phải là ASCII, do đó prompt được truyền đi sau khi mã hóa URL, và bị cắt ngắn trước khi mã hóa (để tránh vượt quá giới hạn độ dài header).
+// promptHeaders Truyền về prompt thực tế gửi lên tuyến trên và trạng thái mở rộng vào header của phản hồi,
+// cung cấp cho các bên gọi dạng bảng điều khiển (panel) hiển thị và đối chiếu. Client NAI tiêu chuẩn sẽ không đọc các header này, không ảnh hưởng đến tính tương thích của giao thức.
+// Giá trị header bắt buộc phải là ASCII, do đó prompt được truyền đi dưới dạng URL encode, và sẽ bị cắt ngắn trước khi encode (để tránh vượt quá giới hạn độ dài header).
 function promptHeaders(prompt, expandFlag) {
     const h = {};
     if (expandFlag) h['X-Illust-Expand'] = expandFlag;
     const s = String(prompt ?? '');
-    const cut = s.length > 600 ? s.slice(0, 600) + '...' : s;
+    const cut = s.length > 600 ? s.slice(0, 600) + '…' : s;
     const enc = encodeURIComponent(cut);
     if (enc) h['X-Illust-Prompt'] = enc;
     return h;
 }
 
 /**
- * expandInput Dùng model chat để mở rộng mô tả ngắn gọn thành prompt toàn cảnh hoàn chỉnh (Dùng chung tính năng "Biên dịch nhân vật" của lib/translate.js).
+ * expandInput Dùng model chat để mở rộng mô tả ngắn gọn thành prompt hình ảnh hoàn chỉnh (Tái sử dụng "Dịch nhân vật" của lib/translate.js).
  *
- * Mọi trường hợp thất bại đều trả về { ok:false }, do bên gọi (caller) lùi về (fallback) gửi nguyên trạng, do đó hàm này không throw exception.
- * Nguyên nhân lùi về (fallback) sẽ được ghi vào lịch sử sinh ảnh: Request mở rộng thất bại, timeout, trả về rỗng, độ dài bất thường (Gấp 5 lần đầu vào gốc và lớn hơn 400 ký tự).
+ * Mọi thất bại đều trả về { ok:false }, để bên gọi API tự lùi về việc gửi nguyên xi input, do đó hàm này không ném ra exception (throw).
+ * Nguyên nhân lùi về dự phòng (fallback) sẽ được ghi vào lịch sử tạo: Request mở rộng thất bại, quá thời gian chờ, trả về rỗng, độ dài bất thường (Vượt quá 5 lần input gốc và lớn hơn 400 ký tự).
  *
- * @param {{url:string,key:string,model:string}} target Interface chat tuyến trên
+ * @param {{url:string,key:string,model:string}} target API chat tuyến trên
  * @param {string} text Input gốc
  * @param {{logf:Function}} ctx
  * @returns {Promise<{ok:true,prompt:string,negative:string,size:[number,number]}|{ok:false,error:string}>}
@@ -131,7 +131,7 @@ async function expandInput(target, text, ctx) {
         if (!expanded) throw new Error('Kết quả mở rộng bị rỗng');
         const limit = Math.max(400, text.length * 5);
         if (expanded.length > limit) {
-            throw new Error(`Độ dài kết quả mở rộng bất thường (${expanded.length} ký tự, giới hạn là ${limit})`);
+            throw new Error(`Độ dài kết quả mở rộng bất thường (${expanded.length} ký tự, giới hạn trên ${limit})`);
         }
 
         rec.ok = true;
@@ -140,7 +140,7 @@ async function expandInput(target, text, ctx) {
         rec.prompt = truncate(expanded, 80);
         rec.size = `${r.width}x${r.height}`;
         genLog.Add(rec);
-        ctx.logf(`[Expand] Mở rộng thành công (${rec.latency_ms}ms): ${[...text].length} chữ -> ${[...expanded].length} chữ, kích thước đề xuất ${rec.size}`);
+        ctx.logf(`[Expand] Mở rộng thành công (${rec.latency_ms}ms): ${[...text].length} chữ -> ${[...expanded].length} chữ, đề xuất ${rec.size}`);
         return {
             ok: true,
             prompt: expanded,
@@ -153,12 +153,12 @@ async function expandInput(target, text, ctx) {
         rec.latency_ms = Date.now() - t0;
         rec.error = truncate(err.message, 300);
         genLog.Add(rec);
-        ctx.logf(`[Expand] Mở rộng thất bại, lùi về gửi nguyên trạng: ${err.message}`);
+        ctx.logf(`[Expand] Mở rộng thất bại, lùi về gửi nguyên xi input: ${err.message}`);
         return { ok: false, error: err.message };
     }
 }
 
-// wantsExpand Client có yêu cầu mở rộng input trước không (Chuỗi truy vấn có chứa `expand=1`).
+// wantsExpand Xem client có yêu cầu mở rộng input trước không (Query string có chứa `expand=1`).
 function wantsExpand(req) {
     return /[?&]expand=1(?:&|$)/.test(String(req?.url ?? ''));
 }
@@ -174,20 +174,20 @@ export async function handleGenerateImage(req, res, ctx) {
     try {
         raw = await ctx.readBody(32 << 20);
     } catch (err) {
-        return sendJSON(res, 400, { message: 'Đọc request body thất bại: ' + err.message });
+        return sendJSON(res, 400, { message: 'Đọc body request thất bại: ' + err.message });
     }
 
-    // Khoan dung với các trường hợp BOM UTF-8 do một số client/công cụ mang lại
+    // Khoan dung với UTF-8 BOM từ một số client/tool
     let text = Buffer.from(raw).toString('utf8');
     if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
 
     let body;
     try {
         body = JSON.parse(text);
-        // Nhất quán với việc phân tích (parsing) khoan dung của bản Go (Struct thiếu trường sẽ mang giá trị zero)
+        // Tương tự với parse khoan dung của bản Go (Nếu struct thiếu trường thì lấy giá trị zero)
         body = body && typeof body === 'object' ? body : {};
     } catch (err) {
-        return sendJSON(res, 400, { message: 'Request body không phải là JSON hợp lệ: ' + err.message });
+        return sendJSON(res, 400, { message: 'Body request không phải JSON hợp lệ: ' + err.message });
     }
 
     let prompt = String(body.input ?? '').trim();
@@ -195,7 +195,7 @@ export async function handleGenerateImage(req, res, ctx) {
     let neg = strFromMap(params, 'negative_prompt');
     if (!neg) neg = v4BaseNegative(params);
 
-    // Kích thước do client chỉ định rõ ràng (Khi thiếu có thể dùng giá trị đề xuất từ việc mở rộng bù vào, xem recSize bên dưới)
+    // Kích thước do client chỉ định rõ (Khi bị thiếu có thể được bù đắp bằng kích thước đề xuất từ bản mở rộng, xem recSize bên dưới)
     const reqW = numFromMap(params, 'width');
     const reqH = numFromMap(params, 'height');
 
@@ -206,9 +206,9 @@ export async function handleGenerateImage(req, res, ctx) {
         defaultSize: settingsGet.defaultSize(),
     };
 
-    // -- Tùy chọn: Mở rộng input (Kích hoạt khi chuỗi truy vấn (query string) của client có mang `expand=1`) --
-    // Giao input cho model chat để mở rộng thành prompt toàn cảnh hoàn chỉnh, dành cho các cổng vào sinh ảnh bắt nguồn từ mô tả ngắn gọn như "Biên dịch xuất ảnh" của V.Canvas.
-    // Khi thất bại, timeout, trả về rỗng hoặc độ dài bất thường sẽ lùi về gửi đi nguyên trạng, không làm gián đoạn quá trình xuất ảnh; sự kiện lùi về (fallback) được ghi vào lịch sử sinh ảnh.
+    // -- Tùy chọn: Mở rộng input (Kích hoạt khi query string của client có chứa `expand=1`) --
+    // Giao input cho model chat để mở rộng thành prompt hình ảnh hoàn chỉnh, cung cấp cho các cổng vào kích hoạt bằng mô tả ngắn gọn như "Dịch xuất ảnh" của V.Canvas.
+    // Khi thất bại, quá thời gian chờ, trả về rỗng hoặc độ dài bất thường sẽ lùi về việc gửi nguyên xi input, không cản trở quá trình tạo ảnh; Sự kiện lùi về dự phòng (fallback) sẽ được ghi vào lịch sử tạo.
     let recSize = null;
     let expandFlag = '';
     if (wantsExpand(req) && prompt !== '') {
@@ -238,12 +238,12 @@ export async function handleGenerateImage(req, res, ctx) {
 
     if (prompt === '') {
         rec.status = 400;
-        rec.error = 'Từ khóa tích cực (input) bị rỗng';
+        rec.error = 'Prompt tích cực (input) bị rỗng';
         genLog.Add(rec);
-        return sendJSON(res, 400, { message: 'Từ khóa tích cực (input) bị rỗng, client chưa ráp ra từ khóa tích cực' });
+        return sendJSON(res, 400, { message: 'Prompt tích cực (input) bị rỗng, client chưa nối được từ tích cực' });
     }
 
-    ctx.logf(`[Gen] Request sinh ảnh model=${JSON.stringify(body.model ?? '')} size=${size} steps=${numStr(params, 'steps')} seed=${numStr(params, 'seed')} Từ khóa phủ định=${[...neg].length} chữ Từ khóa tích cực=${[...prompt].length} chữ`);
+    ctx.logf(`[Gen] Request tạo ảnh model=${JSON.stringify(body.model ?? '')} size=${size} steps=${numStr(params, 'steps')} seed=${numStr(params, 'seed')} Từ tiêu cực=${[...neg].length} chữ Từ tích cực=${[...prompt].length} chữ`);
 
     let result, gerr = null;
     try {
@@ -259,7 +259,7 @@ export async function handleGenerateImage(req, res, ctx) {
         rec.via = 'images';
         rec.error = truncate(gerr.message, 300);
         genLog.Add(rec);
-        ctx.logf(`[Gen] Sinh ảnh thất bại (${rec.latency_ms}ms): ${gerr.message}`);
+        ctx.logf(`[Gen] Tạo ảnh thất bại (${rec.latency_ms}ms): ${gerr.message}`);
         return sendJSON(res, 502, { message: truncate(gerr.message, 500), statusCode: 502 });
     }
 
@@ -267,33 +267,33 @@ export async function handleGenerateImage(req, res, ctx) {
     rec.status = 200;
     rec.via = result.via;
     genLog.Add(rec);
-    ctx.logf(`[Gen] Sinh ảnh thành công (${rec.latency_ms}ms via ${result.via}): ${size} ${result.ext} ${Math.floor((result.data?.length ?? 0) / 1024)}KB`);
+    ctx.logf(`[Gen] Tạo ảnh thành công (${rec.latency_ms}ms via ${result.via}): ${size} ${result.ext} ${Math.floor((result.data?.length ?? 0) / 1024)}KB`);
 
-    // Lấy byte của ảnh trước (Ở local có sẵn thì dùng trực tiếp; Chỉ khi nào là link từ xa mới do server thay mặt download một lần)
+    // Lấy byte của ảnh trước (Đã có cục bộ thì dùng luôn; Nếu chỉ có link từ xa thì server sẽ tải hộ một lần)
     let bytes = null;
     try {
         if (result.data) {
             bytes = result.data;
         } else if (result.remoteUrl) {
-            // Giáng cấp do cross-domain (CORS): Local không lấy được byte, server sẽ thay mặt download một lần (Server không bị giới hạn cross-domain, thường sẽ thành công)
+            // Giáng cấp cross-origin: Không lấy được byte ở cục bộ, server sẽ tải hộ một lần (Server không bị giới hạn cross-origin, thường sẽ thành công)
             const dl = await fetch(result.remoteUrl);
-            if (!dl.ok) throw new Error(`Thay mặt download ảnh thất bại: HTTP ${dl.status}`);
+            if (!dl.ok) throw new Error(`Tải hộ ảnh thất bại: HTTP ${dl.status}`);
             bytes = new Uint8Array(await dl.arrayBuffer());
         } else {
-            throw new Error('Kết quả sinh ảnh bị rỗng');
+            throw new Error('Kết quả tạo ảnh bị rỗng');
         }
     } catch (err) {
         ctx.logf(`[Gen] Lấy ảnh thất bại: ${err.message}`);
         return sendJSON(res, 502, { message: 'Lấy ảnh thất bại: ' + err.message });
     }
 
-    // -- Chế độ xuất thẳng (Raw Mode): Khi client khai báo chỉ cần hình ảnh (`Accept: image/*` hoặc chuỗi truy vấn có mang `raw=1`),
-    //    sẽ trực tiếp stream byte của PNG/JPEG trả về cho nó, **không bọc vỏ ZIP** -- Client nhận được là có thể hiển thị trực tiếp,
-    //    tiết kiệm được bước giải nén (unpack). Mặc định vẫn trả về ZIP, vì đó là định dạng response của giao thức NovelAI
-    //    (SillyTavern helper cũng như bất kỳ client NAI tiêu chuẩn nào đều dựa vào nó). --
+    // -- Chế độ xuất trực tiếp: Khi client tuyên bố chỉ cần ảnh (`Accept: image/*` hoặc query string chứa `raw=1`),
+    //    sẽ trả thẳng luồng byte PNG/JPEG về cho nó, **không bọc vỏ ZIP** - Client nhận được là hiển thị ngay,
+    //    tiết kiệm được bước giải nén. Mặc định vẫn trả về ZIP, vì đó là định dạng phản hồi của giao thức NovelAI
+    //    (Trợ lý SillyTavern cũng như mọi client NAI tiêu chuẩn đều phụ thuộc vào nó). --
     if (wantsRawImage(req)) {
         const buf = Buffer.from(bytes);
-        ctx.logf(`[Gen] Xuất thẳng ảnh (${result.ext}, ${Math.floor(buf.length / 1024)}KB, chưa bọc vỏ ZIP)`);
+        ctx.logf(`[Gen] Xuất ảnh trực tiếp (${result.ext}, ${Math.floor(buf.length / 1024)}KB, không bọc ZIP)`);
         res.writeHead(200, {
             'Content-Type': mimeForExt(result.ext),
             'Content-Length': buf.length,
@@ -305,7 +305,7 @@ export async function handleGenerateImage(req, res, ctx) {
         return;
     }
 
-    // Đóng gói thành ZIP để trả về (Định dạng giao thức NovelAI: Sau khi client giải nén sẽ lấy file ảnh đầu tiên)
+    // Đóng gói ZIP để trả về (Định dạng giao thức NovelAI: Sau khi client giải nén sẽ lấy file ảnh đầu tiên)
     const zip = createZip('image_0.' + result.ext, bytes);
 
     res.writeHead(200, {
@@ -318,10 +318,10 @@ export async function handleGenerateImage(req, res, ctx) {
     res.end(zip);
 }
 
-// wantsRawImage Client có muốn "Ảnh không bọc vỏ" hay không.
-//   - Trong `Accept` có image/ và không chủ động yêu cầu zip  -> Xuất thẳng ảnh
-//   - Chuỗi truy vấn (query string) có mang `raw=1`            -> Ép buộc xuất thẳng
-//   - Còn lại (`*/*` của trình duyệt, `application/zip` của client cũ) -> Đi qua ZIP tiêu chuẩn, giữ tương thích giao thức
+// wantsRawImage Xem client có muốn "ảnh không bọc vỏ" không.
+//   - Trong `Accept` có chứa image/ và không chủ động xin zip  -> Xuất ảnh trực tiếp
+//   - Query string có chứa `raw=1`                        -> Bắt buộc xuất trực tiếp
+//   - Các trường hợp còn lại (`*/*` của trình duyệt, `application/zip` của client cũ) -> Đi theo luồng ZIP tiêu chuẩn, giữ tính tương thích giao thức
 function wantsRawImage(req) {
     const url = String(req?.url ?? '');
     if (/[?&]raw=1(?:&|$)/.test(url)) return true;
@@ -330,7 +330,7 @@ function wantsRawImage(req) {
     return accept.includes('image/') && !accept.includes('zip');
 }
 
-// handleSubscription GET /ai/user/subscription -> Thông tin gói đăng ký (Dùng cho "Test kết nối" của client).
+// handleSubscription GET /ai/user/subscription -> Thông tin đăng ký (Dùng cho tính năng "Test kết nối" của client).
 export function handleSubscription(req, res) {
     if (req.method !== 'GET' && req.method !== 'POST') {
         return sendJSON(res, 405, { message: 'Chỉ hỗ trợ GET' });
@@ -342,10 +342,10 @@ export function handleSubscription(req, res) {
     });
 }
 
-// handleEncodeVibe POST /ai/encode-vibe -> Khẳng định rõ là không hỗ trợ (404).
+// handleEncodeVibe POST /ai/encode-vibe -> Tuyên bố rõ là không hỗ trợ (404).
 export function handleEncodeVibe(req, res) {
     sendJSON(res, 404, {
-        message: 'Dịch vụ này không hỗ trợ mã hóa ảnh tham khảo vibe (Backend là sinh ảnh tuyến trên, không có năng lực vibe); Vui lòng tắt ảnh tham khảo vibe trong client',
+        message: 'Service này không hỗ trợ mã hóa ảnh tham chiếu vibe (Backend là tạo ảnh tuyến trên, không có khả năng xử lý vibe); Vui lòng tắt tính năng ảnh tham chiếu vibe trên client',
         statusCode: 404,
     });
 }
